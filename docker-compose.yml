@@ -1,0 +1,12 @@
+services:
+  agentnxt-code-assist:
+    build: .
+    image: ghcr.io/agentnxt/agentnxt-code-assist:latest
+    ports:
+      - "8090:8090"
+    env_file:
+      - .env
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ${HOME}:${HOME}
+    restart: unless-stopped

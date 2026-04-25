@@ -1,0 +1,48 @@
+name: Deploy to Cloud Run
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+env:
+  PROJECT_ID: thefractionalpm
+  SERVICE_NAME: agentnxt-code-assist
+  REGION: us-central1
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # Note: This assumes you have set up Workload Identity Federation or a Service Account Key
+      # See: https://github.com/google-github-actions/auth
+      - name: Google Auth
+        id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          token_format: access_token
+          workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
+          service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
+
+      - name: Deploy to Cloud Run
+        id: deploy
+        uses: google-github-actions/deploy-cloudrun@v2
+        with:
+          service: ${{ env.SERVICE_NAME }}
+          region: ${{ env.REGION }}
+          source: ./
+          flags: '--allow-unauthenticated --port=8090'
+          env_vars: |
+            AGENTNXT_CODE_ASSIST_HOST=0.0.0.0
+            AGENTNXT_CODE_ASSIST_PORT=8090
+
+      - name: Show output
+        run: echo ${{ steps.deploy.outputs.url }}
