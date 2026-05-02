@@ -28,8 +28,11 @@ from agentnxt_code_assist.git_workspace import (
     get_current_sha,
     push_branch,
 )
+from agentnxt_code_assist.memory_store import append_memory, memory_prompt_block, read_memory
+from agentnxt_code_assist.rag_knowledge import load_rag_context
 from agentnxt_code_assist.repo_audit import audit_repo
 from agentnxt_code_assist.schemas import AssistRequest, AssistResult, CheckResult, NotificationResult, RepoAnomalyResult
+from agentnxt_code_assist.skill_registry import skill_prompt_block
 from agentnxt_code_assist.slack_notifier import notify_slack
 from agentnxt_code_assist.webhook_notifier import notify_webhook
 
@@ -54,7 +57,16 @@ class AiderCodeAssist:
         pushed = False
         anomalies = self._collect_anomalies(repo_path, request)
         hydrated_context = self._hydrate_context(request, output)
-        instruction = self._compose_instruction(request.instruction, hydrated_context, anomalies)
+        memory_context = self._memory_context(repo_path, request, output)
+        rag_context = self._rag_context(repo_path, request, output)
+        instruction = self._compose_instruction(
+            request.instruction,
+            hydrated_context,
+            anomalies,
+            skill_prompt_block(request.skills),
+            memory_context,
+            rag_context,
+        )
 
         try:
             if self._fails_anomaly_gate(anomalies, request.fail_on_anomaly_severity):
@@ -70,8 +82,9 @@ class AiderCodeAssist:
                     pushed=pushed,
                     ok=False,
                     hydrated_context=hydrated_context,
+                    rag_context=rag_context,
                 )
-                return self._maybe_notify(request, result)
+                return self._finalize(request, repo_path, result)
 
             with self._run_lock:
                 with (
@@ -107,8 +120,9 @@ class AiderCodeAssist:
                 pushed=pushed,
                 ok=checks_ok,
                 hydrated_context=hydrated_context,
+                rag_context=rag_context,
             )
-            return self._maybe_notify(request, result)
+            return self._finalize(request, repo_path, result)
         except Exception as exc:
             result = self._result(
                 request=request,
@@ -122,8 +136,9 @@ class AiderCodeAssist:
                 pushed=pushed,
                 ok=False,
                 hydrated_context=hydrated_context,
+                rag_context=rag_context,
             )
-            return self._maybe_notify(request, result)
+            return self._finalize(request, repo_path, result)
 
     def _result(
         self,
@@ -139,6 +154,7 @@ class AiderCodeAssist:
         pushed: bool,
         ok: bool,
         hydrated_context: str | None,
+        rag_context: str | None,
     ) -> AssistResult:
         changed_files = self._changed_files(repo_path)
         after_sha = self._safe_current_sha(repo_path)
@@ -170,6 +186,7 @@ class AiderCodeAssist:
                 error = error or f"failed to write change log: {exc}"
                 ok = False
 
+        memory_path = request.memory_path if request.enable_memory else None
         return AssistResult(
             ok=ok,
             repo_path=str(repo_path),
@@ -191,6 +208,8 @@ class AiderCodeAssist:
             pull_number=request.pull_number,
             discussion_number=request.discussion_number,
             hydrated_context=hydrated_context,
+            rag_context=rag_context,
+            memory_path=memory_path,
             anomalies=anomalies,
             change_log=change_log,
             change_log_path=change_log_path,
@@ -411,8 +430,47 @@ class AiderCodeAssist:
         return context.to_prompt_block() if context else None
 
     @staticmethod
-    def _compose_instruction(instruction: str, hydrated_context: str | None, anomalies: list[RepoAnomalyResult]) -> str:
+    def _memory_context(repo_path: Path, request: AssistRequest, output: io.StringIO) -> str | None:
+        if not request.enable_memory:
+            return None
+        try:
+            return memory_prompt_block(read_memory(repo_path, request.memory_path))
+        except Exception as exc:
+            output.write(f"Failed to read memory: {exc}\n")
+            return None
+
+    @staticmethod
+    def _rag_context(repo_path: Path, request: AssistRequest, output: io.StringIO) -> str | None:
+        if not request.rag_paths and not request.rag_urls:
+            return None
+        try:
+            return load_rag_context(
+                repo_path=repo_path,
+                query=request.instruction,
+                paths=request.rag_paths,
+                remote_urls=request.rag_urls,
+                max_chars=request.rag_max_chars,
+            )
+        except Exception as exc:
+            output.write(f"Failed to load RAG context: {exc}\n")
+            return None
+
+    @staticmethod
+    def _compose_instruction(
+        instruction: str,
+        hydrated_context: str | None,
+        anomalies: list[RepoAnomalyResult],
+        skills_context: str | None,
+        memory_context: str | None,
+        rag_context: str | None,
+    ) -> str:
         parts = [instruction.strip()]
+        if skills_context:
+            parts.append("\n\n" + skills_context)
+        if memory_context:
+            parts.append("\n\n" + memory_context)
+        if rag_context:
+            parts.append("\n\n" + rag_context)
         if hydrated_context:
             parts.append("\n\n## Hydrated target context\n" + hydrated_context)
         if anomalies:
@@ -429,6 +487,19 @@ class AiderCodeAssist:
             return False
         threshold_rank = _SEVERITY_RANK[threshold]
         return any(_SEVERITY_RANK.get(anomaly.severity, 0) >= threshold_rank for anomaly in anomalies)
+
+    def _finalize(self, request: AssistRequest, repo_path: Path, result: AssistResult) -> AssistResult:
+        if request.enable_memory and request.update_memory:
+            try:
+                written_path = append_memory(repo_path, request.memory_path, result)
+                result.memory_path = str(written_path.relative_to(repo_path))
+                if result.memory_path not in result.changed_files:
+                    result.changed_files = self._changed_files(repo_path)
+            except Exception as exc:
+                result.output = result.output + f"\nFailed to update memory: {exc}\n"
+                result.error = result.error or f"failed to update memory: {exc}"
+                result.ok = False
+        return self._maybe_notify(request, result)
 
     def _maybe_notify(self, request: AssistRequest, result: AssistResult) -> AssistResult:
         result = self._maybe_notify_slack(request, result)
