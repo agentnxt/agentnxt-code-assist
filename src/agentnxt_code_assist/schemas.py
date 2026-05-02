@@ -39,6 +39,13 @@ class AssistRequest(BaseModel):
     hydrate_context: bool = True
     audit_repo: bool = True
     fail_on_anomaly_severity: str | None = None
+
+    # Write/remote-operation guardrails. These must be explicitly authorized.
+    allow_commits: bool = False
+    allow_push: bool = False
+    allow_pr: bool = False
+    allow_merge: bool = False
+
     push: bool = False
     open_pr: bool = False
     pr_title: str | None = None
@@ -87,8 +94,16 @@ class AssistRequest(BaseModel):
             self.work_branch = f"code-assist/{suffix}"
         if self.work_branch in {"main", "master", self.base_branch}:
             raise ValueError("work_branch must not be the base branch")
+        if self.auto_commits and not self.allow_commits:
+            raise ValueError("auto_commits requires allow_commits=true")
+        if self.push and not self.allow_push:
+            raise ValueError("push requires allow_push=true")
+        if self.open_pr and not self.allow_pr:
+            raise ValueError("open_pr requires allow_pr=true")
         if self.open_pr and not self.push:
             raise ValueError("open_pr requires push=true")
+        if self.allow_merge:
+            raise ValueError("merge is not supported by code-assist; merge must happen outside this tool after human approval")
         if self.fail_on_anomaly_severity not in {None, "info", "warning", "error"}:
             raise ValueError("fail_on_anomaly_severity must be info, warning, error, or null")
         return self
