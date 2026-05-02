@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
+from pathlib import Path
 
 from dotenv import load_dotenv
 
@@ -23,6 +24,9 @@ class Settings:
     auto_yes: bool = True
     auto_commits: bool = False
     dry_run: bool = False
+    workspace_root: Path = Path("/srv/agennext/code-assist/workspaces")
+    git_user_name: str = "agennext-code-assist"
+    git_user_email: str = "code-assist@agennext.local"
 
     @classmethod
     def from_env(cls) -> "Settings":
@@ -34,5 +38,14 @@ class Settings:
             auto_yes=_env_bool("AGENTNXT_CODE_ASSIST_AUTO_YES", cls.auto_yes),
             auto_commits=_env_bool("AGENTNXT_CODE_ASSIST_AUTO_COMMITS", cls.auto_commits),
             dry_run=_env_bool("AGENTNXT_CODE_ASSIST_DRY_RUN", cls.dry_run),
+            workspace_root=Path(
+                os.getenv("AGENTNXT_CODE_ASSIST_WORKSPACE", str(cls.workspace_root))
+            ),
+            git_user_name=os.getenv(
+                "AGENTNXT_CODE_ASSIST_GIT_USER_NAME", cls.git_user_name
+            ),
+            git_user_email=os.getenv(
+                "AGENTNXT_CODE_ASSIST_GIT_USER_EMAIL", cls.git_user_email
+            ),
         )
 
