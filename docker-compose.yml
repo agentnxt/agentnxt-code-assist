@@ -1,7 +1,7 @@
 services:
-  agentnxt-code-assist:
+  agennext-code-assist:
     build: .
-    image: ghcr.io/agentnxt/agentnxt-code-assist:latest
+    image: ghcr.io/agennext/agennext-code-assist:latest
     ports:
       - "8090:8090"
     env_file:
