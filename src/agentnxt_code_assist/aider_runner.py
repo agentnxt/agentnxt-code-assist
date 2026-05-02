@@ -14,7 +14,10 @@ from pathlib import Path
 from typing import Any
 
 from agentnxt_code_assist.change_log import append_change_log, build_change_log
+from agentnxt_code_assist.check_planner import planned_checks
 from agentnxt_code_assist.config import Settings
+from agentnxt_code_assist.context_fetcher import fetch_target_context
+from agentnxt_code_assist.dependency_audit import audit_dependencies
 from agentnxt_code_assist.git_workspace import (
     changed_files as git_changed_files,
     checkout_base_branch,
@@ -24,7 +27,12 @@ from agentnxt_code_assist.git_workspace import (
     get_current_sha,
     push_branch,
 )
-from agentnxt_code_assist.schemas import AssistRequest, AssistResult, CheckResult, RepoAnomalyResult
+from agentnxt_code_assist.repo_audit import audit_repo
+from agentnxt_code_assist.schemas import AssistRequest, AssistResult, CheckResult, RepoAnomalyResult, SlackResult
+from agentnxt_code_assist.slack_notifier import notify_slack
+
+
+_SEVERITY_RANK = {"info": 1, "warning": 2, "error": 3}
 
 
 class AiderCodeAssist:
@@ -42,9 +50,26 @@ class AiderCodeAssist:
         before_sha = self._safe_current_sha(repo_path)
         checks: list[CheckResult] = []
         pushed = False
-        anomalies: list[RepoAnomalyResult] = []
+        anomalies = self._collect_anomalies(repo_path, request)
+        hydrated_context = self._hydrate_context(request, output)
+        instruction = self._compose_instruction(request.instruction, hydrated_context, anomalies)
 
         try:
+            if self._fails_anomaly_gate(anomalies, request.fail_on_anomaly_severity):
+                return self._result(
+                    request=request,
+                    repo_path=repo_path,
+                    files=files,
+                    output=output.getvalue(),
+                    error=f"anomaly gate failed at severity {request.fail_on_anomaly_severity}",
+                    before_sha=before_sha,
+                    checks=checks,
+                    anomalies=anomalies,
+                    pushed=pushed,
+                    ok=False,
+                    hydrated_context=hydrated_context,
+                )
+
             with self._run_lock:
                 with (
                     self._temporary_env(env),
@@ -53,12 +78,13 @@ class AiderCodeAssist:
                     contextlib.redirect_stderr(output),
                 ):
                     coder = self._create_coder(request, files)
-                    result = coder.run(request.instruction)
+                    result = coder.run(instruction)
                     if result:
                         output.write(str(result))
                         output.write("\n")
 
-            checks = self._run_checks(repo_path, request.checks)
+            check_commands = planned_checks(repo_path, request.checks)
+            checks = self._run_checks(repo_path, check_commands)
             checks_ok = all(check.exit_code == 0 for check in checks)
             if request.push and checks_ok and request.work_branch:
                 push_branch(repo_path, request.work_branch)
@@ -66,7 +92,7 @@ class AiderCodeAssist:
             elif request.push and not checks_ok:
                 output.write("Skipping push because one or more checks failed.\n")
 
-            return self._result(
+            result = self._result(
                 request=request,
                 repo_path=repo_path,
                 files=files,
@@ -77,9 +103,11 @@ class AiderCodeAssist:
                 anomalies=anomalies,
                 pushed=pushed,
                 ok=checks_ok,
+                hydrated_context=hydrated_context,
             )
+            return self._maybe_notify_slack(request, result)
         except Exception as exc:
-            return self._result(
+            result = self._result(
                 request=request,
                 repo_path=repo_path,
                 files=files,
@@ -90,7 +118,9 @@ class AiderCodeAssist:
                 anomalies=anomalies,
                 pushed=pushed,
                 ok=False,
+                hydrated_context=hydrated_context,
             )
+            return self._maybe_notify_slack(request, result)
 
     def _result(
         self,
@@ -105,6 +135,7 @@ class AiderCodeAssist:
         anomalies: list[RepoAnomalyResult],
         pushed: bool,
         ok: bool,
+        hydrated_context: str | None,
     ) -> AssistResult:
         changed_files = self._changed_files(repo_path)
         after_sha = self._safe_current_sha(repo_path)
@@ -156,7 +187,7 @@ class AiderCodeAssist:
             issue_number=request.issue_number,
             pull_number=request.pull_number,
             discussion_number=request.discussion_number,
-            hydrated_context=None,
+            hydrated_context=hydrated_context,
             anomalies=anomalies,
             change_log=change_log,
             change_log_path=change_log_path,
@@ -332,6 +363,78 @@ class AiderCodeAssist:
                 )
             )
         return results
+
+    @staticmethod
+    def _collect_anomalies(repo_path: Path, request: AssistRequest) -> list[RepoAnomalyResult]:
+        anomalies: list[RepoAnomalyResult] = []
+        if request.audit_repo:
+            anomalies.extend(
+                RepoAnomalyResult(
+                    severity=item.severity,
+                    code=item.code,
+                    message=item.message,
+                    evidence=item.evidence,
+                )
+                for item in audit_repo(repo_path)
+            )
+        if request.audit_dependencies:
+            anomalies.extend(
+                RepoAnomalyResult(
+                    severity=item.severity,
+                    code=item.code,
+                    message=item.message,
+                    evidence=item.evidence,
+                )
+                for item in audit_dependencies(repo_path, check_upstream=request.check_upstream_versions)
+            )
+        return anomalies
+
+    @staticmethod
+    def _hydrate_context(request: AssistRequest, output: io.StringIO) -> str | None:
+        if not request.hydrate_context:
+            return None
+        try:
+            context = fetch_target_context(
+                repo_full_name=request.repo_full_name,
+                target_kind=request.target_kind,
+                issue_number=request.issue_number,
+                pull_number=request.pull_number,
+                discussion_number=request.discussion_number,
+                target_url=request.target_url,
+            )
+        except Exception as exc:
+            output.write(f"Failed to hydrate target context: {exc}\n")
+            return None
+        return context.to_prompt_block() if context else None
+
+    @staticmethod
+    def _compose_instruction(instruction: str, hydrated_context: str | None, anomalies: list[RepoAnomalyResult]) -> str:
+        parts = [instruction.strip()]
+        if hydrated_context:
+            parts.append("\n\n## Hydrated target context\n" + hydrated_context)
+        if anomalies:
+            lines = ["\n\n## Repository/dependency anomalies to consider"]
+            for anomaly in anomalies:
+                evidence = f" Evidence: {anomaly.evidence}" if anomaly.evidence else ""
+                lines.append(f"- [{anomaly.severity}] {anomaly.code}: {anomaly.message}{evidence}")
+            parts.append("\n".join(lines))
+        return "".join(parts)
+
+    @staticmethod
+    def _fails_anomaly_gate(anomalies: list[RepoAnomalyResult], threshold: str | None) -> bool:
+        if threshold is None:
+            return False
+        threshold_rank = _SEVERITY_RANK[threshold]
+        return any(_SEVERITY_RANK.get(anomaly.severity, 0) >= threshold_rank for anomaly in anomalies)
+
+    def _maybe_notify_slack(self, request: AssistRequest, result: AssistResult) -> AssistResult:
+        if not (request.notify_slack or self.settings.enable_slack):
+            return result
+        notification = notify_slack(request.slack_webhook_url or self.settings.slack_webhook_url, result)
+        result.slack = SlackResult(sent=notification.sent, error=notification.error)
+        if notification.error:
+            result.output = result.output + f"\nSlack notification failed: {notification.error}\n"
+        return result
 
     @staticmethod
     @contextlib.contextmanager
