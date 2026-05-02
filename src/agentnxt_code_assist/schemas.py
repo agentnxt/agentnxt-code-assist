@@ -46,6 +46,7 @@ class AssistRequest(BaseModel):
     audit_dependencies: bool = True
     check_upstream_versions: bool = False
     fail_on_anomaly_severity: str | None = None
+    skills: list[str] = Field(default_factory=list)
     write_change_log: bool = True
     change_log_path: str = "CODE_ASSIST_CHANGELOG.md"
     notify_slack: bool = False
