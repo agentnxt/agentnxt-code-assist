@@ -27,6 +27,8 @@ class Settings:
     workspace_root: Path = Path("/srv/agennext/code-assist/workspaces")
     git_user_name: str = "agennext-code-assist"
     git_user_email: str = "code-assist@agennext.local"
+    slack_webhook_url: str | None = None
+    enable_slack: bool = False
 
     @classmethod
     def from_env(cls) -> "Settings":
@@ -47,5 +49,7 @@ class Settings:
             git_user_email=os.getenv(
                 "AGENTNXT_CODE_ASSIST_GIT_USER_EMAIL", cls.git_user_email
             ),
+            slack_webhook_url=os.getenv("AGENTNXT_CODE_ASSIST_SLACK_WEBHOOK_URL"),
+            enable_slack=_env_bool("AGENTNXT_CODE_ASSIST_ENABLE_SLACK", cls.enable_slack),
         )
 
