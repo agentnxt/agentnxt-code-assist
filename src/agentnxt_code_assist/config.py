@@ -41,6 +41,12 @@ class Settings:
     git_user_email: str = "code-assist@agennext.local"
     slack_webhook_url: str | None = None
     enable_slack: bool = False
+    webhook_url: str | None = None
+    enable_webhook: bool = False
+    smtp_url: str | None = None
+    smtp_from_email: str = "agennext-code-assist@localhost"
+    smtp_to_email: str | None = None
+    enable_smtp: bool = False
 
     @classmethod
     def from_env(cls) -> "Settings":
@@ -64,5 +70,12 @@ class Settings:
             ) or cls.git_user_email,
             slack_webhook_url=_env("AGENNEXT_CODE_ASSIST_SLACK_WEBHOOK_URL"),
             enable_slack=_env_bool("AGENNEXT_CODE_ASSIST_ENABLE_SLACK", cls.enable_slack),
+            webhook_url=_env("AGENNEXT_CODE_ASSIST_WEBHOOK_URL"),
+            enable_webhook=_env_bool("AGENNEXT_CODE_ASSIST_ENABLE_WEBHOOK", cls.enable_webhook),
+            smtp_url=_env("AGENNEXT_CODE_ASSIST_SMTP_URL"),
+            smtp_from_email=_env("AGENNEXT_CODE_ASSIST_SMTP_FROM_EMAIL", cls.smtp_from_email)
+            or cls.smtp_from_email,
+            smtp_to_email=_env("AGENNEXT_CODE_ASSIST_SMTP_TO_EMAIL"),
+            enable_smtp=_env_bool("AGENNEXT_CODE_ASSIST_ENABLE_SMTP", cls.enable_smtp),
         )
 
