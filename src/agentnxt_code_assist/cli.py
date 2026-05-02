@@ -1,4 +1,4 @@
-"""Command line interface for AgentNXT Code Assist."""
+"""Command line interface for AGenNext Code Assist."""
 
 from __future__ import annotations
 
@@ -9,27 +9,64 @@ import uvicorn
 
 from agentnxt_code_assist.aider_runner import AiderCodeAssist
 from agentnxt_code_assist.config import Settings
+from agentnxt_code_assist.ports import find_available_port
 from agentnxt_code_assist.schemas import AssistRequest
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="agentnxt-code-assist")
+    parser = argparse.ArgumentParser(prog="agennext-code-assist")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     run_parser = subparsers.add_parser("run", help="Run one code-assist instruction")
     run_parser.add_argument("instruction", help="Natural language coding instruction")
-    run_parser.add_argument("--repo", required=True, type=Path, help="Target repository path")
+    repo_group = run_parser.add_mutually_exclusive_group(required=True)
+    repo_group.add_argument("--repo", dest="repo_path", type=Path, help="Existing target repository path")
+    repo_group.add_argument("--repo-url", help="Git repository URL to clone/fetch into the managed workspace")
+    repo_group.add_argument("--repo-full-name", help="GitHub repository full name, for example AGenNext/Platform")
+    repo_group.add_argument(
+        "--target-url",
+        help="GitHub repo, branch, pull request, issue, or discussion URL to resolve automatically",
+    )
+    run_parser.add_argument("--base-branch", default="main", help="Base branch for managed checkout mode")
+    run_parser.add_argument("--work-branch", help="Work branch for managed checkout mode")
+    run_parser.add_argument("--workspace-root", type=Path, help="Managed checkout workspace root")
+    run_parser.add_argument("--issue", dest="issue_number", type=int, help="Issue number for default branch naming")
+    run_parser.add_argument("--pull", dest="pull_number", type=int, help="Pull request number for metadata/branch naming")
+    run_parser.add_argument("--discussion", dest="discussion_number", type=int, help="Discussion number for metadata/branch naming")
+    run_parser.add_argument("--push", action="store_true", help="Request branch push after successful checks; requires --allow-push")
+    run_parser.add_argument("--open-pr", action="store_true", help="Reserved for future PR creation support; requires --allow-pr and --push")
+    run_parser.add_argument("--allow-commits", action="store_true", help="Explicitly allow Aider auto-commits when --auto-commits is used")
+    run_parser.add_argument("--allow-push", action="store_true", help="Explicitly allow pushing the work branch")
+    run_parser.add_argument("--allow-pr", action="store_true", help="Explicitly allow opening a pull request when implemented")
+    run_parser.add_argument("--check", action="append", default=[], help="Post-edit check command or preset to run inside the repo")
+    run_parser.add_argument("--check-upstream-versions", action="store_true", help="Check upstream package versions during dependency audit")
+    run_parser.add_argument("--no-hydrate-context", action="store_true", help="Do not fetch GitHub issue/PR context")
+    run_parser.add_argument("--no-repo-audit", action="store_true", help="Disable README/code consistency audit")
+    run_parser.add_argument("--no-dependency-audit", action="store_true", help="Disable dependency/Docker publishability audit")
+    run_parser.add_argument("--fail-on-anomaly-severity", choices=["info", "warning", "error"], help="Fail before editing if anomalies at this severity or higher are found")
+    run_parser.add_argument("--no-change-log", action="store_true", help="Do not write CODE_ASSIST_CHANGELOG.md")
+    run_parser.add_argument("--change-log-path", default="CODE_ASSIST_CHANGELOG.md", help="Path for per-run change log inside the target repo")
+    run_parser.add_argument("--notify-slack", action="store_true", help="Send optional Slack notification after the run")
+    run_parser.add_argument("--slack-webhook-url", help="Slack incoming webhook URL for this run")
+    run_parser.add_argument("--notify-webhook", action="store_true", help="Send optional generic JSON webhook notification after the run")
+    run_parser.add_argument("--webhook-url", help="Generic webhook URL for this run")
+    run_parser.add_argument("--notify-smtp", action="store_true", help="Send optional SMTP email notification after the run")
+    run_parser.add_argument("--smtp-url", help="SMTP URL, for example smtp://user:pass@smtp.example.com:587?starttls=true")
+    run_parser.add_argument("--smtp-from-email", help="Email sender address for SMTP notifications")
+    run_parser.add_argument("--smtp-to-email", help="Email recipient address for SMTP notifications")
     run_parser.add_argument("--file", action="append", default=[], help="File to add to Aider chat")
     run_parser.add_argument("--model", help="Aider/LiteLLM model name")
     run_parser.add_argument("--dry-run", action="store_true", help="Ask Aider to avoid writing files")
-    run_parser.add_argument("--auto-commits", action="store_true", help="Allow Aider to commit edits")
+    run_parser.add_argument("--auto-commits", action="store_true", help="Request Aider commits; requires --allow-commits")
     run_parser.add_argument("--no-auto-yes", action="store_true", help="Do not auto-confirm Aider prompts")
     run_parser.add_argument("--stream", action="store_true", help="Stream model output when supported by Aider")
     run_parser.add_argument("--json", action="store_true", help="Print the full JSON result")
 
     serve_parser = subparsers.add_parser("serve", help="Start the HTTP API")
     serve_parser.add_argument("--host", help="Bind host")
-    serve_parser.add_argument("--port", type=int, help="Bind port")
+    serve_parser.add_argument("--port", type=int, help="Preferred bind port")
+    serve_parser.add_argument("--fixed-port", action="store_true", help="Fail if the preferred port is unavailable")
+    serve_parser.add_argument("--port-scan-limit", type=int, default=100, help="Number of sequential ports to scan")
 
     return parser
 
@@ -39,7 +76,37 @@ def run_command(args: argparse.Namespace, settings: Settings) -> int:
     result = assistant.run(
         AssistRequest(
             instruction=args.instruction,
-            repo_path=args.repo,
+            repo_path=args.repo_path,
+            repo_url=args.repo_url,
+            repo_full_name=args.repo_full_name,
+            target_url=args.target_url,
+            base_branch=args.base_branch,
+            work_branch=args.work_branch,
+            workspace_root=args.workspace_root,
+            issue_number=args.issue_number,
+            pull_number=args.pull_number,
+            discussion_number=args.discussion_number,
+            hydrate_context=not args.no_hydrate_context,
+            audit_repo=not args.no_repo_audit,
+            audit_dependencies=not args.no_dependency_audit,
+            check_upstream_versions=args.check_upstream_versions,
+            fail_on_anomaly_severity=args.fail_on_anomaly_severity,
+            write_change_log=not args.no_change_log,
+            change_log_path=args.change_log_path,
+            notify_slack=args.notify_slack,
+            slack_webhook_url=args.slack_webhook_url,
+            notify_webhook=args.notify_webhook,
+            webhook_url=args.webhook_url,
+            notify_smtp=args.notify_smtp,
+            smtp_url=args.smtp_url,
+            smtp_from_email=args.smtp_from_email,
+            smtp_to_email=args.smtp_to_email,
+            allow_commits=args.allow_commits,
+            allow_push=args.allow_push,
+            allow_pr=args.allow_pr,
+            push=args.push,
+            open_pr=args.open_pr,
+            checks=args.check,
             files=args.file,
             model=args.model,
             dry_run=True if args.dry_run else None,
@@ -54,10 +121,42 @@ def run_command(args: argparse.Namespace, settings: Settings) -> int:
     else:
         if result.output:
             print(result.output.rstrip())
+        if result.repo_full_name:
+            print(f"Repository full name: {result.repo_full_name}")
+        if result.target_kind:
+            print(f"Target kind: {result.target_kind}")
+        if result.repo_path:
+            print(f"Repository: {result.repo_path}")
+        if result.work_branch:
+            print(f"Work branch: {result.work_branch}")
+        if result.change_log_path:
+            print(f"Change log: {result.change_log_path}")
+        if result.anomalies:
+            print("Anomalies:")
+            for anomaly in result.anomalies:
+                print(f"  [{anomaly.severity}] {anomaly.code}: {anomaly.message}")
         if result.changed_files:
             print("Changed files:")
             for path in result.changed_files:
                 print(f"  {path}")
+        if result.checks:
+            print("Checks:")
+            for check in result.checks:
+                print(f"  {check.command}: exit {check.exit_code}")
+        if result.slack.sent:
+            print("Slack notification: sent")
+        elif result.slack.error:
+            print(f"Slack notification error: {result.slack.error}")
+        if result.webhook.sent:
+            print("Webhook notification: sent")
+        elif result.webhook.error:
+            print(f"Webhook notification error: {result.webhook.error}")
+        if result.smtp.sent:
+            print("SMTP notification: sent")
+        elif result.smtp.error:
+            print(f"SMTP notification error: {result.smtp.error}")
+        if result.pushed:
+            print("Pushed branch: yes")
         if result.error:
             print(f"Error: {result.error}")
 
@@ -66,7 +165,15 @@ def run_command(args: argparse.Namespace, settings: Settings) -> int:
 
 def serve_command(args: argparse.Namespace, settings: Settings) -> int:
     host = args.host or settings.host
-    port = args.port or settings.port
+    preferred_port = args.port or settings.port
+    port = preferred_port if args.fixed_port else find_available_port(
+        host,
+        preferred_port,
+        max_attempts=args.port_scan_limit,
+    )
+    if port != preferred_port:
+        print(f"Preferred port {preferred_port} is unavailable; using {port}.")
+    print(f"AGenNext Code Assist API listening on http://{host}:{port}")
     uvicorn.run("agentnxt_code_assist.server:app", host=host, port=port, reload=False)
     return 0
 

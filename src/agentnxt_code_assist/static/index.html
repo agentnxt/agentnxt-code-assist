@@ -3,17 +3,17 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>AgentNXT Code Assist</title>
+    <title>AGenNext Code Assist</title>
     <link rel="stylesheet" href="/static/styles.css" />
   </head>
   <body>
     <div class="app-shell">
       <aside class="side-panel">
         <div class="brand-block">
-          <div class="brand-mark">AX</div>
+          <div class="brand-mark">AG</div>
           <div>
-            <h1>AgentNXT Code Assist</h1>
-            <p>Aider-powered repository chat</p>
+            <h1>AGenNext Code Assist</h1>
+            <p>Aider-powered repository assistant</p>
           </div>
         </div>
 
@@ -35,7 +35,7 @@
             </label>
             <label>
               API base URL
-              <input id="api-base" type="url" autocomplete="off" placeholder="https://llm.openautonomyx.com/v1" />
+              <input id="api-base" type="url" autocomplete="off" placeholder="https://llm.agennext.com/v1" />
             </label>
             <label>
               API key
@@ -47,7 +47,7 @@
             <h2>Environment</h2>
             <label>
               Variables
-              <textarea id="env-vars" rows="5" spellcheck="false" placeholder="OPENAI_API_VERSION=2024-10-21&#10;LITELLM_USER=agentnxt"></textarea>
+              <textarea id="env-vars" rows="5" spellcheck="false" placeholder="OPENAI_API_VERSION=2024-10-21&#10;LITELLM_USER=agennext"></textarea>
             </label>
             <div id="server-env" class="env-status" aria-live="polite"></div>
           </section>
@@ -76,7 +76,7 @@
             </label>
             <label class="check-row">
               <input id="auto-commits" type="checkbox" />
-              <span>Allow auto-commits</span>
+              <span>Request auto-commits</span>
             </label>
           </section>
         </form>
@@ -95,7 +95,7 @@
 
         <section id="messages" class="messages" aria-live="polite">
           <article class="message assistant">
-            <div class="avatar">AX</div>
+            <div class="avatar">AG</div>
             <div class="bubble">
               <p>Set the repository, choose the model, then ask for a code change.</p>
             </div>
@@ -103,7 +103,7 @@
         </section>
 
         <form id="chat-form" class="composer">
-          <textarea id="instruction" rows="3" placeholder="Ask AgentNXT to change code in the selected repo..." required></textarea>
+          <textarea id="instruction" rows="3" placeholder="Ask AGenNext to change code in the selected repo..." required></textarea>
           <button id="send-button" type="submit">
             <span>Send</span>
           </button>
