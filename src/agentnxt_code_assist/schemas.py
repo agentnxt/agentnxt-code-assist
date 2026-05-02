@@ -23,6 +23,11 @@ class RepoAnomalyResult(BaseModel):
     evidence: str | None = None
 
 
+class SlackResult(BaseModel):
+    sent: bool = False
+    error: str | None = None
+
+
 class AssistRequest(BaseModel):
     instruction: str = Field(min_length=1)
     repo_path: Path | None = None
@@ -38,9 +43,13 @@ class AssistRequest(BaseModel):
     discussion_number: int | None = None
     hydrate_context: bool = True
     audit_repo: bool = True
+    audit_dependencies: bool = True
+    check_upstream_versions: bool = False
     fail_on_anomaly_severity: str | None = None
     write_change_log: bool = True
     change_log_path: str = "CODE_ASSIST_CHANGELOG.md"
+    notify_slack: bool = False
+    slack_webhook_url: str | None = None
 
     # Write/remote-operation guardrails. These must be explicitly authorized.
     allow_commits: bool = False
@@ -137,3 +146,4 @@ class AssistResult(BaseModel):
     anomalies: list[RepoAnomalyResult] = Field(default_factory=list)
     change_log: str | None = None
     change_log_path: str | None = None
+    slack: SlackResult = Field(default_factory=SlackResult)
