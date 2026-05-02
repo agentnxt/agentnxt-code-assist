@@ -18,6 +18,7 @@ from agentnxt_code_assist.check_planner import planned_checks
 from agentnxt_code_assist.config import Settings
 from agentnxt_code_assist.context_fetcher import fetch_target_context
 from agentnxt_code_assist.dependency_audit import audit_dependencies
+from agentnxt_code_assist.email_notifier import notify_email
 from agentnxt_code_assist.git_workspace import (
     changed_files as git_changed_files,
     checkout_base_branch,
@@ -28,8 +29,9 @@ from agentnxt_code_assist.git_workspace import (
     push_branch,
 )
 from agentnxt_code_assist.repo_audit import audit_repo
-from agentnxt_code_assist.schemas import AssistRequest, AssistResult, CheckResult, RepoAnomalyResult, SlackResult
+from agentnxt_code_assist.schemas import AssistRequest, AssistResult, CheckResult, NotificationResult, RepoAnomalyResult
 from agentnxt_code_assist.slack_notifier import notify_slack
+from agentnxt_code_assist.webhook_notifier import notify_webhook
 
 
 _SEVERITY_RANK = {"info": 1, "warning": 2, "error": 3}
@@ -56,7 +58,7 @@ class AiderCodeAssist:
 
         try:
             if self._fails_anomaly_gate(anomalies, request.fail_on_anomaly_severity):
-                return self._result(
+                result = self._result(
                     request=request,
                     repo_path=repo_path,
                     files=files,
@@ -69,6 +71,7 @@ class AiderCodeAssist:
                     ok=False,
                     hydrated_context=hydrated_context,
                 )
+                return self._maybe_notify(request, result)
 
             with self._run_lock:
                 with (
@@ -105,7 +108,7 @@ class AiderCodeAssist:
                 ok=checks_ok,
                 hydrated_context=hydrated_context,
             )
-            return self._maybe_notify_slack(request, result)
+            return self._maybe_notify(request, result)
         except Exception as exc:
             result = self._result(
                 request=request,
@@ -120,7 +123,7 @@ class AiderCodeAssist:
                 ok=False,
                 hydrated_context=hydrated_context,
             )
-            return self._maybe_notify_slack(request, result)
+            return self._maybe_notify(request, result)
 
     def _result(
         self,
@@ -427,13 +430,42 @@ class AiderCodeAssist:
         threshold_rank = _SEVERITY_RANK[threshold]
         return any(_SEVERITY_RANK.get(anomaly.severity, 0) >= threshold_rank for anomaly in anomalies)
 
+    def _maybe_notify(self, request: AssistRequest, result: AssistResult) -> AssistResult:
+        result = self._maybe_notify_slack(request, result)
+        result = self._maybe_notify_webhook(request, result)
+        result = self._maybe_notify_smtp(request, result)
+        return result
+
     def _maybe_notify_slack(self, request: AssistRequest, result: AssistResult) -> AssistResult:
         if not (request.notify_slack or self.settings.enable_slack):
             return result
         notification = notify_slack(request.slack_webhook_url or self.settings.slack_webhook_url, result)
-        result.slack = SlackResult(sent=notification.sent, error=notification.error)
+        result.slack = NotificationResult(sent=notification.sent, error=notification.error)
         if notification.error:
             result.output = result.output + f"\nSlack notification failed: {notification.error}\n"
+        return result
+
+    def _maybe_notify_webhook(self, request: AssistRequest, result: AssistResult) -> AssistResult:
+        if not (request.notify_webhook or self.settings.enable_webhook):
+            return result
+        notification = notify_webhook(request.webhook_url or self.settings.webhook_url, result)
+        result.webhook = NotificationResult(sent=notification.sent, error=notification.error)
+        if notification.error:
+            result.output = result.output + f"\nWebhook notification failed: {notification.error}\n"
+        return result
+
+    def _maybe_notify_smtp(self, request: AssistRequest, result: AssistResult) -> AssistResult:
+        if not (request.notify_smtp or self.settings.enable_smtp):
+            return result
+        notification = notify_email(
+            smtp_url=request.smtp_url or self.settings.smtp_url,
+            from_email=request.smtp_from_email or self.settings.smtp_from_email,
+            to_email=request.smtp_to_email or self.settings.smtp_to_email,
+            result=result,
+        )
+        result.smtp = NotificationResult(sent=notification.sent, error=notification.error)
+        if notification.error:
+            result.output = result.output + f"\nSMTP notification failed: {notification.error}\n"
         return result
 
     @staticmethod
