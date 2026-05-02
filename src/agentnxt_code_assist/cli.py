@@ -38,6 +38,15 @@ def build_parser() -> argparse.ArgumentParser:
     run_parser.add_argument("--allow-push", action="store_true", help="Explicitly allow pushing the work branch")
     run_parser.add_argument("--allow-pr", action="store_true", help="Explicitly allow opening a pull request when implemented")
     run_parser.add_argument("--check", action="append", default=[], help="Post-edit check command or preset to run inside the repo")
+    run_parser.add_argument("--check-upstream-versions", action="store_true", help="Check upstream package versions during dependency audit")
+    run_parser.add_argument("--no-hydrate-context", action="store_true", help="Do not fetch GitHub issue/PR context")
+    run_parser.add_argument("--no-repo-audit", action="store_true", help="Disable README/code consistency audit")
+    run_parser.add_argument("--no-dependency-audit", action="store_true", help="Disable dependency/Docker publishability audit")
+    run_parser.add_argument("--fail-on-anomaly-severity", choices=["info", "warning", "error"], help="Fail before editing if anomalies at this severity or higher are found")
+    run_parser.add_argument("--no-change-log", action="store_true", help="Do not write CODE_ASSIST_CHANGELOG.md")
+    run_parser.add_argument("--change-log-path", default="CODE_ASSIST_CHANGELOG.md", help="Path for per-run change log inside the target repo")
+    run_parser.add_argument("--notify-slack", action="store_true", help="Send optional Slack notification after the run")
+    run_parser.add_argument("--slack-webhook-url", help="Slack incoming webhook URL for this run")
     run_parser.add_argument("--file", action="append", default=[], help="File to add to Aider chat")
     run_parser.add_argument("--model", help="Aider/LiteLLM model name")
     run_parser.add_argument("--dry-run", action="store_true", help="Ask Aider to avoid writing files")
@@ -68,6 +77,15 @@ def run_command(args: argparse.Namespace, settings: Settings) -> int:
             issue_number=args.issue_number,
             pull_number=args.pull_number,
             discussion_number=args.discussion_number,
+            hydrate_context=not args.no_hydrate_context,
+            audit_repo=not args.no_repo_audit,
+            audit_dependencies=not args.no_dependency_audit,
+            check_upstream_versions=args.check_upstream_versions,
+            fail_on_anomaly_severity=args.fail_on_anomaly_severity,
+            write_change_log=not args.no_change_log,
+            change_log_path=args.change_log_path,
+            notify_slack=args.notify_slack,
+            slack_webhook_url=args.slack_webhook_url,
             allow_commits=args.allow_commits,
             allow_push=args.allow_push,
             allow_pr=args.allow_pr,
@@ -96,6 +114,8 @@ def run_command(args: argparse.Namespace, settings: Settings) -> int:
             print(f"Repository: {result.repo_path}")
         if result.work_branch:
             print(f"Work branch: {result.work_branch}")
+        if result.change_log_path:
+            print(f"Change log: {result.change_log_path}")
         if result.anomalies:
             print("Anomalies:")
             for anomaly in result.anomalies:
@@ -108,6 +128,10 @@ def run_command(args: argparse.Namespace, settings: Settings) -> int:
             print("Checks:")
             for check in result.checks:
                 print(f"  {check.command}: exit {check.exit_code}")
+        if result.slack.sent:
+            print("Slack notification: sent")
+        elif result.slack.error:
+            print(f"Slack notification error: {result.slack.error}")
         if result.pushed:
             print("Pushed branch: yes")
         if result.error:
