@@ -47,6 +47,12 @@ class AssistRequest(BaseModel):
     check_upstream_versions: bool = False
     fail_on_anomaly_severity: str | None = None
     skills: list[str] = Field(default_factory=list)
+    enable_memory: bool = False
+    memory_path: str = ".agennext/memory.md"
+    update_memory: bool = True
+    rag_paths: list[str] = Field(default_factory=list)
+    rag_urls: list[str] = Field(default_factory=list)
+    rag_max_chars: int = 24000
     write_change_log: bool = True
     change_log_path: str = "CODE_ASSIST_CHANGELOG.md"
     notify_slack: bool = False
@@ -126,6 +132,10 @@ class AssistRequest(BaseModel):
             raise ValueError("fail_on_anomaly_severity must be info, warning, error, or null")
         if not self.change_log_path.strip():
             raise ValueError("change_log_path must not be empty")
+        if not self.memory_path.strip():
+            raise ValueError("memory_path must not be empty")
+        if self.rag_max_chars < 1000 or self.rag_max_chars > 100000:
+            raise ValueError("rag_max_chars must be between 1000 and 100000")
         return self
 
 
@@ -150,6 +160,8 @@ class AssistResult(BaseModel):
     pull_number: int | None = None
     discussion_number: int | None = None
     hydrated_context: str | None = None
+    rag_context: str | None = None
+    memory_path: str | None = None
     anomalies: list[RepoAnomalyResult] = Field(default_factory=list)
     change_log: str | None = None
     change_log_path: str | None = None
