@@ -2,8 +2,10 @@ services:
   agennext-code-assist:
     build: .
     image: ghcr.io/agennext/agennext-code-assist:latest
+    expose:
+      - "8090"
     ports:
-      - "8090:8090"
+      - "${AGENNEXT_CODE_ASSIST_PORT:-8090}:8090"
     env_file:
       - .env
     volumes:
@@ -15,12 +17,38 @@ services:
     build:
       context: ./web
     image: ghcr.io/agennext/agennext-code-assist-web:latest
+    expose:
+      - "3000"
     ports:
-      - "3000:3000"
+      - "${AGENNEXT_CODE_ASSIST_WEB_PORT:-3000}:3000"
     environment:
-      - NEXT_PUBLIC_AGENNEXT_CODE_ASSIST_API_URL=http://localhost:8090
+      - NEXT_PUBLIC_AGENNEXT_CODE_ASSIST_API_URL=${NEXT_PUBLIC_AGENNEXT_CODE_ASSIST_API_URL:-http://localhost:${AGENNEXT_CODE_ASSIST_PORT:-8090}}
     depends_on:
       - agennext-code-assist
     profiles:
       - web
     restart: unless-stopped
+
+  caddy:
+    image: caddy:2-alpine
+    profiles:
+      - edge
+    depends_on:
+      - agennext-code-assist
+      - agennext-code-assist-web
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      - AGENNEXT_CODE_ASSIST_DOMAIN=${AGENNEXT_CODE_ASSIST_DOMAIN:-localhost}
+      - AGENNEXT_CODE_ASSIST_API_DOMAIN=${AGENNEXT_CODE_ASSIST_API_DOMAIN:-api.localhost}
+      - CADDY_ACME_EMAIL=${CADDY_ACME_EMAIL:-admin@example.com}
+    volumes:
+      - ./deploy/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    restart: unless-stopped
+
+volumes:
+  caddy_data:
+  caddy_config:
