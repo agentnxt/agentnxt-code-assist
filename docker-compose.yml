@@ -10,3 +10,17 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
       - ${HOME}:${HOME}
     restart: unless-stopped
+
+  agennext-code-assist-web:
+    build:
+      context: ./web
+    image: ghcr.io/agennext/agennext-code-assist-web:latest
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_AGENNEXT_CODE_ASSIST_API_URL=http://localhost:8090
+    depends_on:
+      - agennext-code-assist
+    profiles:
+      - web
+    restart: unless-stopped
