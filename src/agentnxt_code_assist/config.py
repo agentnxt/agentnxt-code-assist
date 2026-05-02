@@ -1,4 +1,4 @@
-"""Runtime configuration for AgentNXT Code Assist."""
+"""Runtime configuration for AGenNext Code Assist."""
 
 from __future__ import annotations
 
@@ -9,8 +9,20 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 
-def _env_bool(name: str, default: bool) -> bool:
+def _env(name: str, default: str | None = None) -> str | None:
+    """Read AGenNext env vars with backward-compatible AgentNXT fallback."""
+
     value = os.getenv(name)
+    if value is not None:
+        return value
+    legacy_name = name.replace("AGENNEXT_", "AGENTNXT_", 1)
+    if legacy_name != name:
+        return os.getenv(legacy_name, default)
+    return default
+
+
+def _env_bool(name: str, default: bool) -> bool:
+    value = _env(name)
     if value is None:
         return default
     return value.strip().lower() in {"1", "true", "yes", "on"}
@@ -34,22 +46,23 @@ class Settings:
     def from_env(cls) -> "Settings":
         load_dotenv()
         return cls(
-            model=os.getenv("AGENTNXT_CODE_ASSIST_MODEL", os.getenv("AIDER_MODEL", cls.model)),
-            host=os.getenv("AGENTNXT_CODE_ASSIST_HOST", cls.host),
-            port=int(os.getenv("AGENTNXT_CODE_ASSIST_PORT", str(cls.port))),
-            auto_yes=_env_bool("AGENTNXT_CODE_ASSIST_AUTO_YES", cls.auto_yes),
-            auto_commits=_env_bool("AGENTNXT_CODE_ASSIST_AUTO_COMMITS", cls.auto_commits),
-            dry_run=_env_bool("AGENTNXT_CODE_ASSIST_DRY_RUN", cls.dry_run),
+            model=_env("AGENNEXT_CODE_ASSIST_MODEL", os.getenv("AIDER_MODEL", cls.model)) or cls.model,
+            host=_env("AGENNEXT_CODE_ASSIST_HOST", cls.host) or cls.host,
+            port=int(_env("AGENNEXT_CODE_ASSIST_PORT", str(cls.port)) or cls.port),
+            auto_yes=_env_bool("AGENNEXT_CODE_ASSIST_AUTO_YES", cls.auto_yes),
+            auto_commits=_env_bool("AGENNEXT_CODE_ASSIST_AUTO_COMMITS", cls.auto_commits),
+            dry_run=_env_bool("AGENNEXT_CODE_ASSIST_DRY_RUN", cls.dry_run),
             workspace_root=Path(
-                os.getenv("AGENTNXT_CODE_ASSIST_WORKSPACE", str(cls.workspace_root))
+                _env("AGENNEXT_CODE_ASSIST_WORKSPACE", str(cls.workspace_root))
+                or str(cls.workspace_root)
             ),
-            git_user_name=os.getenv(
-                "AGENTNXT_CODE_ASSIST_GIT_USER_NAME", cls.git_user_name
-            ),
-            git_user_email=os.getenv(
-                "AGENTNXT_CODE_ASSIST_GIT_USER_EMAIL", cls.git_user_email
-            ),
-            slack_webhook_url=os.getenv("AGENTNXT_CODE_ASSIST_SLACK_WEBHOOK_URL"),
-            enable_slack=_env_bool("AGENTNXT_CODE_ASSIST_ENABLE_SLACK", cls.enable_slack),
+            git_user_name=_env(
+                "AGENNEXT_CODE_ASSIST_GIT_USER_NAME", cls.git_user_name
+            ) or cls.git_user_name,
+            git_user_email=_env(
+                "AGENNEXT_CODE_ASSIST_GIT_USER_EMAIL", cls.git_user_email
+            ) or cls.git_user_email,
+            slack_webhook_url=_env("AGENNEXT_CODE_ASSIST_SLACK_WEBHOOK_URL"),
+            enable_slack=_env_bool("AGENNEXT_CODE_ASSIST_ENABLE_SLACK", cls.enable_slack),
         )
 
