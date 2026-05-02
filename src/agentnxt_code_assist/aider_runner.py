@@ -64,37 +64,64 @@ class AiderCodeAssist:
             elif request.push and not checks_ok:
                 output.write("Skipping push because one or more checks failed.\n")
 
-            return AssistResult(
-                ok=checks_ok,
-                repo_path=str(repo_path),
-                files=[str(path) for path in files],
-                changed_files=self._changed_files(repo_path),
+            return self._result(
+                request=request,
+                repo_path=repo_path,
+                files=files,
                 output=output.getvalue(),
                 error=None if checks_ok else "one or more checks failed",
-                base_branch=request.base_branch if self._is_managed_checkout(request) else None,
-                work_branch=request.work_branch,
                 before_sha=before_sha,
-                after_sha=self._safe_current_sha(repo_path),
                 checks=checks,
                 pushed=pushed,
-                pr_url=None,
+                ok=checks_ok,
             )
         except Exception as exc:
-            return AssistResult(
-                ok=False,
-                repo_path=str(repo_path),
-                files=[str(path) for path in files],
-                changed_files=self._changed_files(repo_path),
+            return self._result(
+                request=request,
+                repo_path=repo_path,
+                files=files,
                 output=output.getvalue(),
                 error=str(exc),
-                base_branch=request.base_branch if self._is_managed_checkout(request) else None,
-                work_branch=request.work_branch,
                 before_sha=before_sha,
-                after_sha=self._safe_current_sha(repo_path),
                 checks=checks,
                 pushed=pushed,
-                pr_url=None,
+                ok=False,
             )
+
+    def _result(
+        self,
+        *,
+        request: AssistRequest,
+        repo_path: Path,
+        files: list[Path],
+        output: str,
+        error: str | None,
+        before_sha: str | None,
+        checks: list[CheckResult],
+        pushed: bool,
+        ok: bool,
+    ) -> AssistResult:
+        return AssistResult(
+            ok=ok,
+            repo_path=str(repo_path),
+            files=[str(path) for path in files],
+            changed_files=self._changed_files(repo_path),
+            output=output,
+            error=error,
+            base_branch=request.base_branch if self._is_managed_checkout(request) else None,
+            work_branch=request.work_branch,
+            before_sha=before_sha,
+            after_sha=self._safe_current_sha(repo_path),
+            checks=checks,
+            pushed=pushed,
+            pr_url=None,
+            target_url=request.target_url,
+            target_kind=request.target_kind,
+            repo_full_name=request.repo_full_name,
+            issue_number=request.issue_number,
+            pull_number=request.pull_number,
+            discussion_number=request.discussion_number,
+        )
 
     def _prepare_repo(self, request: AssistRequest) -> Path:
         if self._is_managed_checkout(request):
@@ -121,7 +148,7 @@ class AiderCodeAssist:
 
     @staticmethod
     def _is_managed_checkout(request: AssistRequest) -> bool:
-        return bool(request.repo_url or request.repo_full_name)
+        return bool(request.repo_url or request.repo_full_name or request.target_url)
 
     def _create_coder(self, request: AssistRequest, files: list[Path]) -> Any:
         try:
