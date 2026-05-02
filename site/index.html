@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>AGenNext Code Assist</title>
+    <meta
+      name="description"
+      content="AGenNext Code Assist is an operator-focused coding assistant with managed checkout, guardrails, production checks, notifications, Docker simulation, and optional web UI."
+    />
+    <meta name="theme-color" content="#09111f" />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <header class="nav">
+      <a class="brand" href="#top" aria-label="AGenNext Code Assist home">
+        <span class="brand-mark">AG</span>
+        <span>AGenNext Code Assist</span>
+      </a>
+      <nav aria-label="Primary navigation">
+        <a href="#features">Features</a>
+        <a href="#quickstart">Quickstart</a>
+        <a href="#architecture">Architecture</a>
+        <a href="#roadmap">Roadmap</a>
+        <a class="nav-cta" href="https://github.com/AGenNext/Code-Assist">GitHub</a>
+      </nav>
+    </header>
+
+    <main id="top">
+      <section class="hero">
+        <div class="hero-copy">
+          <p class="eyebrow">Runtime-ready coding operations</p>
+          <h1>Code Assist for safe, reviewable repository changes.</h1>
+          <p class="lede">
+            Run focused coding tasks with managed checkout, branch guardrails, production checks, change logs,
+            notifications, Docker Desktop simulation, and an optional operator UI.
+          </p>
+          <div class="actions">
+            <a class="button primary" href="#quickstart">Get started</a>
+            <a class="button secondary" href="https://github.com/AGenNext/Code-Assist/pulls">View PRs</a>
+          </div>
+        </div>
+        <div class="terminal-card" aria-label="Example command">
+          <div class="terminal-dots" aria-hidden="true"><span></span><span></span><span></span></div>
+          <pre><code>agennext-code-assist run \
+  "Make this repo production-ready" \
+  --target-url &lt;repo-or-issue-url&gt; \
+  --work-branch code-assist/issue-1 \
+  --check production \
+  --json</code></pre>
+        </div>
+      </section>
+
+      <section id="features" class="section">
+        <div class="section-heading">
+          <p class="eyebrow">Implemented capabilities</p>
+          <h2>Built for controlled code changes</h2>
+        </div>
+        <div class="grid cards">
+          <article class="card">
+            <h3>Managed checkout</h3>
+            <p>Resolve target repositories and GitHub URLs into safe work branches.</p>
+          </article>
+          <article class="card">
+            <h3>Guardrails</h3>
+            <p>No commit, push, PR, merge, or notification without explicit authorization.</p>
+          </article>
+          <article class="card">
+            <h3>Production checks</h3>
+            <p>Run dependency, typecheck, lint, unit, integration, smoke, Docker, and publishability checks.</p>
+          </article>
+          <article class="card">
+            <h3>Change logs</h3>
+            <p>Generate per-run logs with objective, changed files, checks, anomalies, and next steps.</p>
+          </article>
+          <article class="card">
+            <h3>Notifications</h3>
+            <p>Optional Slack, generic webhook, and SMTP run notifications.</p>
+          </article>
+          <article class="card">
+            <h3>Operator UI</h3>
+            <p>Optional Next.js chat UI for target inputs, check selection, guardrails, and review.</p>
+          </article>
+        </div>
+      </section>
+
+      <section id="quickstart" class="section split">
+        <div>
+          <p class="eyebrow">Quickstart</p>
+          <h2>Run locally or in Docker Desktop</h2>
+          <p>
+            Start with the Python CLI, run the FastAPI backend, or launch the local production simulation with Docker Desktop.
+          </p>
+        </div>
+        <div class="code-stack">
+          <pre><code>git clone https://github.com/AGenNext/Code-Assist.git
+cd Code-Assist
+python3.12 -m venv .venv
+.venv/bin/pip install -e .
+cp .env.example .env</code></pre>
+          <pre><code>agennext-code-assist serve --host 127.0.0.1 --port 8090</code></pre>
+          <pre><code>bash scripts/simulate-production.sh up</code></pre>
+        </div>
+      </section>
+
+      <section id="architecture" class="section">
+        <div class="section-heading">
+          <p class="eyebrow">Architecture</p>
+          <h2>Orchestrator-first design</h2>
+        </div>
+        <div class="timeline">
+          <div class="timeline-item">
+            <span>01</span>
+            <div>
+              <h3>Target resolution</h3>
+              <p>Resolve local repos or GitHub URLs into a controlled work branch and hydrated task context.</p>
+            </div>
+          </div>
+          <div class="timeline-item">
+            <span>02</span>
+            <div>
+              <h3>Focused code pass</h3>
+              <p>Run Aider-backed edits with selected files, skills, memory, and bounded knowledge context.</p>
+            </div>
+          </div>
+          <div class="timeline-item">
+            <span>03</span>
+            <div>
+              <h3>Validation</h3>
+              <p>Run checks, anomaly detection, Docker simulation, and optional notification delivery.</p>
+            </div>
+          </div>
+          <div class="timeline-item">
+            <span>04</span>
+            <div>
+              <h3>Future gates</h3>
+              <p>Planned gate microservices will enforce audit traces, update modes, security scans, cloud RAG, and policy decisions.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="roadmap" class="section roadmap">
+        <div>
+          <p class="eyebrow">Tracked next</p>
+          <h2>Planned hardening work</h2>
+          <p>These items are tracked as future planned work after the current implemented release.</p>
+        </div>
+        <ul class="issue-list">
+          <li><a href="https://github.com/AGenNext/Code-Assist/issues/3">#3 Update mode enforcement: GitHub API or Git CLI only</a></li>
+          <li><a href="https://github.com/AGenNext/Code-Assist/issues/4">#4 Mandatory audit trace ledger for every changed file</a></li>
+          <li><a href="https://github.com/AGenNext/Code-Assist/issues/5">#5 Production security gates and vulnerability checks</a></li>
+          <li><a href="https://github.com/AGenNext/Code-Assist/issues/6">#6 Independent gate microservices</a></li>
+          <li><a href="https://github.com/AGenNext/Code-Assist/issues/7">#7 Cloud RAG backend and memory compaction</a></li>
+        </ul>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <p>AGenNext Code Assist</p>
+      <a href="https://github.com/AGenNext/Code-Assist">github.com/AGenNext/Code-Assist</a>
+    </footer>
+  </body>
+</html>
