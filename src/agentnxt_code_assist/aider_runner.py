@@ -13,6 +13,7 @@ from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
 
+from agentnxt_code_assist.change_log import append_change_log, build_change_log
 from agentnxt_code_assist.config import Settings
 from agentnxt_code_assist.git_workspace import (
     changed_files as git_changed_files,
@@ -23,7 +24,7 @@ from agentnxt_code_assist.git_workspace import (
     get_current_sha,
     push_branch,
 )
-from agentnxt_code_assist.schemas import AssistRequest, AssistResult, CheckResult
+from agentnxt_code_assist.schemas import AssistRequest, AssistResult, CheckResult, RepoAnomalyResult
 
 
 class AiderCodeAssist:
@@ -41,6 +42,7 @@ class AiderCodeAssist:
         before_sha = self._safe_current_sha(repo_path)
         checks: list[CheckResult] = []
         pushed = False
+        anomalies: list[RepoAnomalyResult] = []
 
         try:
             with self._run_lock:
@@ -72,6 +74,7 @@ class AiderCodeAssist:
                 error=None if checks_ok else "one or more checks failed",
                 before_sha=before_sha,
                 checks=checks,
+                anomalies=anomalies,
                 pushed=pushed,
                 ok=checks_ok,
             )
@@ -84,6 +87,7 @@ class AiderCodeAssist:
                 error=str(exc),
                 before_sha=before_sha,
                 checks=checks,
+                anomalies=anomalies,
                 pushed=pushed,
                 ok=False,
             )
@@ -98,20 +102,51 @@ class AiderCodeAssist:
         error: str | None,
         before_sha: str | None,
         checks: list[CheckResult],
+        anomalies: list[RepoAnomalyResult],
         pushed: bool,
         ok: bool,
     ) -> AssistResult:
+        changed_files = self._changed_files(repo_path)
+        after_sha = self._safe_current_sha(repo_path)
+        change_log = build_change_log(
+            objective=request.instruction,
+            repo_full_name=request.repo_full_name,
+            target_url=request.target_url,
+            target_kind=request.target_kind,
+            base_branch=request.base_branch if self._is_managed_checkout(request) else None,
+            work_branch=request.work_branch,
+            before_sha=before_sha,
+            after_sha=after_sha,
+            changed_files=changed_files,
+            checks=checks,
+            anomalies=anomalies,
+            error=error,
+            pushed=pushed,
+        )
+        change_log_path: str | None = None
+        result_output = output
+        if request.write_change_log:
+            try:
+                written_path = append_change_log(repo_path, request.change_log_path, change_log)
+                change_log_path = str(written_path.relative_to(repo_path))
+                if change_log_path not in changed_files:
+                    changed_files = self._changed_files(repo_path)
+            except Exception as exc:
+                result_output = result_output + f"\nFailed to write change log: {exc}\n"
+                error = error or f"failed to write change log: {exc}"
+                ok = False
+
         return AssistResult(
             ok=ok,
             repo_path=str(repo_path),
             files=[str(path) for path in files],
-            changed_files=self._changed_files(repo_path),
-            output=output,
+            changed_files=changed_files,
+            output=result_output,
             error=error,
             base_branch=request.base_branch if self._is_managed_checkout(request) else None,
             work_branch=request.work_branch,
             before_sha=before_sha,
-            after_sha=self._safe_current_sha(repo_path),
+            after_sha=after_sha,
             checks=checks,
             pushed=pushed,
             pr_url=None,
@@ -121,6 +156,10 @@ class AiderCodeAssist:
             issue_number=request.issue_number,
             pull_number=request.pull_number,
             discussion_number=request.discussion_number,
+            hydrated_context=None,
+            anomalies=anomalies,
+            change_log=change_log,
+            change_log_path=change_log_path,
         )
 
     def _prepare_repo(self, request: AssistRequest) -> Path:
