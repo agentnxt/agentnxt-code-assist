@@ -8,6 +8,11 @@ services:
       - "${AGENNEXT_CODE_ASSIST_PORT:-8090}:8090"
     env_file:
       - .env
+    environment:
+      - GLITCHTIP_DSN=${GLITCHTIP_DSN:-}
+      - OTEL_EXPORTER_OTLP_ENDPOINT=${OTEL_EXPORTER_OTLP_ENDPOINT:-}
+      - OTEL_SERVICE_NAME=${OTEL_SERVICE_NAME:-agennext-code-assist}
+      - HEALTHCHECKS_PING_URL=${HEALTHCHECKS_PING_URL:-}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - ${HOME}:${HOME}
@@ -49,6 +54,128 @@ services:
       - caddy_config:/config
     restart: unless-stopped
 
+  uptime-kuma:
+    image: louislam/uptime-kuma:1
+    profiles:
+      - ops
+      - uptime
+    ports:
+      - "${UPTIME_KUMA_PORT:-3001}:3001"
+    volumes:
+      - uptime_kuma_data:/app/data
+    restart: unless-stopped
+
+  healthchecks:
+    image: healthchecks/healthchecks:latest
+    profiles:
+      - ops
+      - uptime
+    ports:
+      - "${HEALTHCHECKS_PORT:-8000}:8000"
+    environment:
+      - ALLOWED_HOSTS=${HEALTHCHECKS_ALLOWED_HOSTS:-*}
+      - DB=sqlite
+      - DB_NAME=/data/hc.sqlite
+      - DEBUG=False
+      - DEFAULT_FROM_EMAIL=${HEALTHCHECKS_DEFAULT_FROM_EMAIL:-healthchecks@localhost}
+      - EMAIL_HOST=${HEALTHCHECKS_EMAIL_HOST:-localhost}
+      - SECRET_KEY=${HEALTHCHECKS_SECRET_KEY:-change-me-healthchecks-secret}
+      - SITE_ROOT=${HEALTHCHECKS_SITE_ROOT:-http://localhost:${HEALTHCHECKS_PORT:-8000}}
+    volumes:
+      - healthchecks_data:/data
+    restart: unless-stopped
+
+  glitchtip-postgres:
+    image: postgres:16-alpine
+    profiles:
+      - ops
+      - errors
+    environment:
+      - POSTGRES_DB=${GLITCHTIP_POSTGRES_DB:-glitchtip}
+      - POSTGRES_USER=${GLITCHTIP_POSTGRES_USER:-glitchtip}
+      - POSTGRES_PASSWORD=${GLITCHTIP_POSTGRES_PASSWORD:-change-me-glitchtip-db-password}
+    volumes:
+      - glitchtip_postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  glitchtip-redis:
+    image: redis:7-alpine
+    profiles:
+      - ops
+      - errors
+    volumes:
+      - glitchtip_redis_data:/data
+    restart: unless-stopped
+
+  glitchtip:
+    image: glitchtip/glitchtip:latest
+    profiles:
+      - ops
+      - errors
+    depends_on:
+      - glitchtip-postgres
+      - glitchtip-redis
+    ports:
+      - "${GLITCHTIP_PORT:-8081}:8000"
+    environment:
+      - DATABASE_URL=postgres://${GLITCHTIP_POSTGRES_USER:-glitchtip}:${GLITCHTIP_POSTGRES_PASSWORD:-change-me-glitchtip-db-password}@glitchtip-postgres:5432/${GLITCHTIP_POSTGRES_DB:-glitchtip}
+      - REDIS_URL=redis://glitchtip-redis:6379/0
+      - SECRET_KEY=${GLITCHTIP_SECRET_KEY:-change-me-glitchtip-secret}
+      - EMAIL_URL=${GLITCHTIP_EMAIL_URL:-consolemail://}
+      - DEFAULT_FROM_EMAIL=${GLITCHTIP_DEFAULT_FROM_EMAIL:-glitchtip@localhost}
+      - GLITCHTIP_DOMAIN=${GLITCHTIP_DOMAIN:-http://localhost:${GLITCHTIP_PORT:-8081}}
+      - ENABLE_USER_REGISTRATION=${GLITCHTIP_ENABLE_USER_REGISTRATION:-true}
+    restart: unless-stopped
+
+  signoz:
+    image: signoz/signoz:latest
+    profiles:
+      - ops
+      - observability
+    ports:
+      - "${SIGNOZ_PORT:-3301}:3301"
+      - "${SIGNOZ_OTLP_GRPC_PORT:-4317}:4317"
+      - "${SIGNOZ_OTLP_HTTP_PORT:-4318}:4318"
+    volumes:
+      - signoz_data:/var/lib/signoz
+    restart: unless-stopped
+
+  infisical:
+    image: infisical/infisical:latest-postgres
+    profiles:
+      - ops
+      - secrets
+    ports:
+      - "${INFISICAL_PORT:-8082}:8080"
+    environment:
+      - NODE_ENV=production
+      - ENCRYPTION_KEY=${INFISICAL_ENCRYPTION_KEY:-change-me-32-byte-encryption-key}
+      - AUTH_SECRET=${INFISICAL_AUTH_SECRET:-change-me-infisical-auth-secret}
+      - SITE_URL=${INFISICAL_SITE_URL:-http://localhost:${INFISICAL_PORT:-8082}}
+      - DB_CONNECTION_URI=postgres://${INFISICAL_POSTGRES_USER:-infisical}:${INFISICAL_POSTGRES_PASSWORD:-change-me-infisical-db-password}@infisical-postgres:5432/${INFISICAL_POSTGRES_DB:-infisical}
+    depends_on:
+      - infisical-postgres
+    restart: unless-stopped
+
+  infisical-postgres:
+    image: postgres:16-alpine
+    profiles:
+      - ops
+      - secrets
+    environment:
+      - POSTGRES_DB=${INFISICAL_POSTGRES_DB:-infisical}
+      - POSTGRES_USER=${INFISICAL_POSTGRES_USER:-infisical}
+      - POSTGRES_PASSWORD=${INFISICAL_POSTGRES_PASSWORD:-change-me-infisical-db-password}
+    volumes:
+      - infisical_postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
 volumes:
   caddy_data:
   caddy_config:
+  uptime_kuma_data:
+  healthchecks_data:
+  glitchtip_postgres_data:
+  glitchtip_redis_data:
+  signoz_data:
+  infisical_postgres_data:
