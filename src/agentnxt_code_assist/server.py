@@ -1,4 +1,4 @@
-"""HTTP API for AgentNXT Code Assist."""
+"""HTTP API for AGenNext Code Assist."""
 
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ from agentnxt_code_assist.aider_runner import AiderCodeAssist
 from agentnxt_code_assist.config import Settings
 from agentnxt_code_assist.schemas import AssistRequest, AssistResult
 
-app = FastAPI(title="AgentNXT Code Assist", version="0.1.0")
+app = FastAPI(title="AGenNext Code Assist", version="0.1.0")
 assistant = AiderCodeAssist()
 settings = Settings.from_env()
 static_dir = files("agentnxt_code_assist").joinpath("static")
@@ -38,6 +38,7 @@ def config() -> dict[str, object]:
         "ANTHROPIC_API_KEY",
         "ANTHROPIC_BASE_URL",
         "AIDER_MODEL",
+        "AGENNEXT_CODE_ASSIST_MODEL",
         "AGENTNXT_CODE_ASSIST_MODEL",
     ]
     return {

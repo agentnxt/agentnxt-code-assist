@@ -12,5 +12,5 @@ RUN pip install --no-cache-dir .
 
 EXPOSE 8090
 
-CMD ["agentnxt-code-assist", "serve", "--host", "0.0.0.0", "--port", "8090"]
+CMD ["agennext-code-assist", "serve", "--host", "0.0.0.0", "--port", "8090"]
 

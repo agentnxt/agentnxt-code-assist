@@ -1,0 +1,31 @@
+services:
+  agennext-code-assist:
+    profiles:
+      - simulation
+    environment:
+      - AGENNEXT_CODE_ASSIST_WORKSPACE=/workspaces
+      - AGENNEXT_CODE_ASSIST_ENABLE_WEBHOOK=${AGENNEXT_CODE_ASSIST_ENABLE_WEBHOOK:-false}
+      - AGENNEXT_CODE_ASSIST_ENABLE_SMTP=${AGENNEXT_CODE_ASSIST_ENABLE_SMTP:-false}
+      - AGENNEXT_CODE_ASSIST_ENABLE_SLACK=${AGENNEXT_CODE_ASSIST_ENABLE_SLACK:-false}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - code_assist_workspaces:/workspaces
+      - ./tmp/simulation-target:/simulation-target
+
+  agennext-code-assist-web:
+    profiles:
+      - simulation
+      - web
+    environment:
+      - NEXT_PUBLIC_AGENNEXT_CODE_ASSIST_API_URL=http://localhost:${AGENNEXT_CODE_ASSIST_PORT:-8090}
+
+  caddy:
+    profiles:
+      - simulation-edge
+      - edge
+    ports:
+      - "${CADDY_HTTP_PORT:-8088}:80"
+      - "${CADDY_HTTPS_PORT:-8443}:443"
+
+volumes:
+  code_assist_workspaces:
