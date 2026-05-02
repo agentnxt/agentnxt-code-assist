@@ -23,7 +23,7 @@ class RepoAnomalyResult(BaseModel):
     evidence: str | None = None
 
 
-class SlackResult(BaseModel):
+class NotificationResult(BaseModel):
     sent: bool = False
     error: str | None = None
 
@@ -50,6 +50,12 @@ class AssistRequest(BaseModel):
     change_log_path: str = "CODE_ASSIST_CHANGELOG.md"
     notify_slack: bool = False
     slack_webhook_url: str | None = None
+    notify_webhook: bool = False
+    webhook_url: str | None = None
+    notify_smtp: bool = False
+    smtp_url: str | None = None
+    smtp_from_email: str | None = None
+    smtp_to_email: str | None = None
 
     # Write/remote-operation guardrails. These must be explicitly authorized.
     allow_commits: bool = False
@@ -146,4 +152,6 @@ class AssistResult(BaseModel):
     anomalies: list[RepoAnomalyResult] = Field(default_factory=list)
     change_log: str | None = None
     change_log_path: str | None = None
-    slack: SlackResult = Field(default_factory=SlackResult)
+    slack: NotificationResult = Field(default_factory=NotificationResult)
+    webhook: NotificationResult = Field(default_factory=NotificationResult)
+    smtp: NotificationResult = Field(default_factory=NotificationResult)
