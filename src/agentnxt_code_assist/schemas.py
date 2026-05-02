@@ -16,6 +16,13 @@ class CheckResult(BaseModel):
     stderr_tail: str = ""
 
 
+class RepoAnomalyResult(BaseModel):
+    severity: str
+    code: str
+    message: str
+    evidence: str | None = None
+
+
 class AssistRequest(BaseModel):
     instruction: str = Field(min_length=1)
     repo_path: Path | None = None
@@ -29,6 +36,9 @@ class AssistRequest(BaseModel):
     issue_number: int | None = None
     pull_number: int | None = None
     discussion_number: int | None = None
+    hydrate_context: bool = True
+    audit_repo: bool = True
+    fail_on_anomaly_severity: str | None = None
     push: bool = False
     open_pr: bool = False
     pr_title: str | None = None
@@ -79,6 +89,8 @@ class AssistRequest(BaseModel):
             raise ValueError("work_branch must not be the base branch")
         if self.open_pr and not self.push:
             raise ValueError("open_pr requires push=true")
+        if self.fail_on_anomaly_severity not in {None, "info", "warning", "error"}:
+            raise ValueError("fail_on_anomaly_severity must be info, warning, error, or null")
         return self
 
 
@@ -102,3 +114,5 @@ class AssistResult(BaseModel):
     issue_number: int | None = None
     pull_number: int | None = None
     discussion_number: int | None = None
+    hydrated_context: str | None = None
+    anomalies: list[RepoAnomalyResult] = Field(default_factory=list)
