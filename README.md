@@ -9,12 +9,42 @@ It can:
 - run against an existing local checkout
 - clone/fetch a target repo into a managed workspace
 - accept GitHub repo, branch, pull request, issue, or discussion URLs as input
+- hydrate GitHub issue and pull request context into the coding instruction
 - create/reset a safe work branch for each task
-- run post-edit checks such as `npm run type-check` and `npm run lint`
+- flag README/code, dependency, upstream-version, Docker, and publishability anomalies
+- run post-edit validation using presets such as `production`, `smoke`, `unit`, `integration`, `docker`, and `publishable`
+- write a per-run `CODE_ASSIST_CHANGELOG.md` entry with objective, actions, checks, anomalies, and next steps
+- optionally notify Slack after a run
 - expose the same behavior through a FastAPI endpoint
 - support dry runs, automatic confirmations, optional Aider auto-commits, and optional branch push
 
 The Aider Python scripting API is documented by Aider as useful but not a stable compatibility contract, so the wrapper keeps Aider usage isolated in one module.
+
+---
+
+## Safety defaults
+
+Code Assist is local-first and review-first.
+
+By default it does **not**:
+
+- commit
+- push
+- open pull requests
+- merge
+- publish images
+- send Slack notifications
+
+Explicit authorization is required:
+
+```bash
+--auto-commits --allow-commits
+--push --allow-push
+--open-pr --allow-pr --push --allow-push
+--notify-slack
+```
+
+Merge is not supported by Code Assist. Merge must happen outside this tool after human approval.
 
 ---
 
@@ -67,8 +97,7 @@ Use this when Code Assist should clone/fetch the target repo itself.
   --work-branch code-assist/issue-1-phase-1 \
   --file src/app/layout.tsx \
   --file src/app/page.tsx \
-  --check "npm run type-check" \
-  --check "npm run lint" \
+  --check production \
   --json
 ```
 
@@ -120,8 +149,7 @@ Examples:
   --file src/app/layout.tsx \
   --file src/app/page.tsx \
   --file src/components/LogPanel.tsx \
-  --check "npm run type-check" \
-  --check "npm run lint" \
+  --check production \
   --json
 ```
 
@@ -143,7 +171,128 @@ Pull request URL example:
   --work-branch code-assist/pr-12-followup
 ```
 
-Issue and discussion URLs resolve repo metadata and default branch naming, but they do not yet fetch issue/discussion body text into the instruction. Paste the relevant task text into the instruction until GitHub issue/discussion body hydration is added.
+Issue and PR URLs hydrate title/body/state into the coding instruction. Discussion URLs currently resolve metadata but still require the relevant discussion text to be pasted into the instruction.
+
+---
+
+## Production-readiness checks
+
+Use `--check` with a preset or a literal shell command.
+
+Presets:
+
+| Preset | Purpose |
+|---|---|
+| `dependency` | Dependency install/lock validation where possible |
+| `typecheck` | TypeScript/Python type-check script if present |
+| `lint` | Lint script if present |
+| `unit` | Unit test script if present |
+| `integration` | Integration/e2e test script if present |
+| `smoke` | Smoke test or build script if present |
+| `docker` | Docker build / compose config simulation |
+| `docker-smoke` | Docker container smoke run / compose quiet config |
+| `publishable` | Local image inspect/tag simulation for Docker Hub and GHCR |
+| `production` | Runs dependency, typecheck, lint, unit, integration, smoke, docker, docker-smoke, and publishable checks where applicable |
+| `all` | Alias for `production` |
+
+Example:
+
+```bash
+.venv/bin/agentnxt-code-assist run \
+  "Make this repo production-ready and flag anything blocking publishing" \
+  --target-url https://github.com/AGenNext/Platform/issues/1 \
+  --work-branch code-assist/issue-1-production-readiness \
+  --check production \
+  --fail-on-anomaly-severity error \
+  --json
+```
+
+The `publishable` preset only simulates local Docker image readiness and tagging. It does not push images to Docker Hub or GHCR.
+
+---
+
+## Audits and anomalies
+
+Each run can report anomalies for:
+
+- README claims not matching repo files
+- missing scripts documented in README
+- missing SDK/model/framework/Runner/Kernel implementation markers
+- old branding references
+- dependency/lockfile mismatch
+- available upstream package versions when enabled
+- Dockerfile production concerns
+- missing Docker Hub/GHCR publish workflow configuration
+
+Upstream dependency checks are disabled by default because they require network calls:
+
+```bash
+--check-upstream-versions
+```
+
+---
+
+## Change log
+
+By default each run appends a reviewable entry to:
+
+```text
+CODE_ASSIST_CHANGELOG.md
+```
+
+The entry documents:
+
+- objective
+- target repo / URL / branch / SHA
+- actions taken
+- changed files
+- checks and pass/fail status
+- anomalies and risks
+- result
+- next steps
+
+Disable it with:
+
+```bash
+--no-change-log
+```
+
+or choose a path:
+
+```bash
+--change-log-path docs/code-assist-log.md
+```
+
+---
+
+## Slack notifications
+
+Slack is optional and disabled by default.
+
+Configure a webhook:
+
+```env
+AGENTNXT_CODE_ASSIST_SLACK_WEBHOOK_URL=https://hooks.slack.com/services/...
+```
+
+Send a notification for one run:
+
+```bash
+.venv/bin/agentnxt-code-assist run \
+  "Phase 1 only: fix app shell/build issues" \
+  --target-url https://github.com/AGenNext/Platform/issues/1 \
+  --work-branch code-assist/issue-1-phase-1 \
+  --check production \
+  --notify-slack
+```
+
+Or enable globally:
+
+```env
+AGENTNXT_CODE_ASSIST_ENABLE_SLACK=true
+```
+
+Slack notifications include status, repo, branch, changed-file count, failed-check count, anomaly count, and whether anything was pushed.
 
 ---
 
@@ -202,9 +351,10 @@ curl -X POST http://127.0.0.1:8090/assist \
       "src/app/page.tsx",
       "src/components/LogPanel.tsx"
     ],
-    "checks": ["npm run type-check", "npm run lint"],
+    "checks": ["production"],
     "dry_run": false,
-    "push": false
+    "push": false,
+    "notify_slack": false
   }'
 ```
 
@@ -218,13 +368,15 @@ Environment variables:
 |---|---:|---|
 | `AGENTNXT_CODE_ASSIST_MODEL` | `gpt-4o` | Model name passed to Aider/LiteLLM |
 | `AGENTNXT_CODE_ASSIST_AUTO_YES` | `true` | Auto-confirm Aider prompts |
-| `AGENTNXT_CODE_ASSIST_AUTO_COMMITS` | `false` | Let Aider commit its edits |
+| `AGENTNXT_CODE_ASSIST_AUTO_COMMITS` | `false` | Let Aider commit its edits, still requires explicit request authorization |
 | `AGENTNXT_CODE_ASSIST_DRY_RUN` | `false` | Run without writing files |
 | `AGENTNXT_CODE_ASSIST_HOST` | `127.0.0.1` | API host |
 | `AGENTNXT_CODE_ASSIST_PORT` | `8090` | API port |
 | `AGENTNXT_CODE_ASSIST_WORKSPACE` | `/srv/agennext/code-assist/workspaces` | Managed checkout workspace root |
 | `AGENTNXT_CODE_ASSIST_GIT_USER_NAME` | `agennext-code-assist` | Git author name for managed checkouts |
 | `AGENTNXT_CODE_ASSIST_GIT_USER_EMAIL` | `code-assist@agennext.local` | Git author email for managed checkouts |
+| `AGENTNXT_CODE_ASSIST_ENABLE_SLACK` | `false` | Enable Slack notification for all runs |
+| `AGENTNXT_CODE_ASSIST_SLACK_WEBHOOK_URL` | unset | Slack incoming webhook URL |
 | `GITHUB_TOKEN` | unset | Optional token for private repos and pushing HTTPS branches |
 
 Provider credentials such as `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, and OpenAI-compatible gateway variables are read by Aider/LiteLLM.
@@ -243,11 +395,12 @@ result = assistant.run(
         repo_url="https://github.com/AGenNext/Platform.git",
         work_branch="code-assist/add-health",
         files=["server.py"],
-        checks=["npm run type-check"],
+        checks=["production"],
     )
 )
 
 print(result.output)
+print(result.change_log)
 ```
 
 ---
