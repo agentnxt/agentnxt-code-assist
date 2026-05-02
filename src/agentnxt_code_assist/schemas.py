@@ -39,6 +39,8 @@ class AssistRequest(BaseModel):
     hydrate_context: bool = True
     audit_repo: bool = True
     fail_on_anomaly_severity: str | None = None
+    write_change_log: bool = True
+    change_log_path: str = "CODE_ASSIST_CHANGELOG.md"
 
     # Write/remote-operation guardrails. These must be explicitly authorized.
     allow_commits: bool = False
@@ -106,6 +108,8 @@ class AssistRequest(BaseModel):
             raise ValueError("merge is not supported by code-assist; merge must happen outside this tool after human approval")
         if self.fail_on_anomaly_severity not in {None, "info", "warning", "error"}:
             raise ValueError("fail_on_anomaly_severity must be info, warning, error, or null")
+        if not self.change_log_path.strip():
+            raise ValueError("change_log_path must not be empty")
         return self
 
 
@@ -131,3 +135,5 @@ class AssistResult(BaseModel):
     discussion_number: int | None = None
     hydrated_context: str | None = None
     anomalies: list[RepoAnomalyResult] = Field(default_factory=list)
+    change_log: str | None = None
+    change_log_path: str | None = None
