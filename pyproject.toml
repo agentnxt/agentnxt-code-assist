@@ -3,9 +3,9 @@ requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "agentnxt-code-assist"
+name = "agennext-code-assist"
 version = "0.1.0"
-description = "AgentNXT code assistant powered by the Aider Python scripting API."
+description = "AGenNext Code Assist powered by the Aider Python scripting API."
 readme = "README.md"
 requires-python = ">=3.10,<3.13"
 dependencies = [
@@ -20,8 +20,13 @@ dependencies = [
 dev = [
   "pytest>=8.0.0",
 ]
+ui = [
+  "streamlit>=1.36.0",
+]
 
 [project.scripts]
+agennext-code-assist = "agentnxt_code_assist.cli:main"
+# Backward-compatible alias. Prefer `agennext-code-assist` for new usage.
 agentnxt-code-assist = "agentnxt_code_assist.cli:main"
 
 [tool.setuptools.packages.find]
