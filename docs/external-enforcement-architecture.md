@@ -1,8 +1,33 @@
-# AGenNext Runner enforcement architecture
+# AGenNext Kernel, Runner, and Code Assist architecture
 
 AGenNext Code Assist is an agent. It must not be treated as the ultimate policy enforcement point.
 
+**AGenNext Kernel is the infrastructure abstraction layer.**
+
 **AGenNext Runner is the runtime enforcement point.**
+
+## Stack responsibility model
+
+```text
+AGenNext Kernel
+  -> infrastructure abstraction layer
+  -> makes deployments infra-agnostic
+  -> abstracts compute, filesystem, network, secrets, sandbox, container, and execution backends
+  -> provides low-level primitives to Runner
+
+AGenNext Runner
+  -> runtime enforcement layer
+  -> makes agent execution framework-agnostic
+  -> grants/denies scoped capabilities
+  -> enforces AuthZEN decisions and runtime guardrails
+  -> invokes Kernel primitives for actual infrastructure operations
+
+AGenNext Code Assist
+  -> agent / requester / planner
+  -> proposes code changes
+  -> requests capabilities from Runner
+  -> never self-authorizes privileged actions
+```
 
 ## Correct responsibility split
 
@@ -29,11 +54,17 @@ AGenNext Runner
   -> blocks or allows tool execution
   -> owns fail-closed behavior
   -> owns scoped execution capabilities
-  -> controls GitHub API / Git CLI access
+  -> controls access to Kernel infrastructure primitives
   -> records or forwards audit evidence
 
-GitHub API / Git CLI / Sandbox
-  -> performs the actual repository operation only after AGenNext Runner allows it
+AGenNext Kernel
+  -> infra abstraction point
+  -> executes allowed low-level operations across local, VM, container, cloud, or Kubernetes targets
+  -> keeps Runner and agents deployment/infra agnostic
+
+GitHub API / Git CLI / Sandbox / Containers / Cloud
+  -> concrete execution backends reached through Runner + Kernel
+  -> perform actual operations only after Runner allows them
 ```
 
 ## Roles
@@ -42,10 +73,11 @@ GitHub API / Git CLI / Sandbox
 |---|---|
 | Code Assist | Agent / requester / planner |
 | AGenNext Runner | Runtime / policy enforcement point |
+| AGenNext Kernel | Infrastructure abstraction layer |
 | OIDC provider | Authentication provider |
 | Agent ID registry | Agent identity and governance context provider |
 | AuthZEN service | Policy decision point |
-| GitHub API / Git CLI | Resource operation backend controlled by Runner |
+| GitHub API / Git CLI | Resource operation backend controlled by Runner through Kernel |
 | Audit service | Evidence and trace ledger |
 
 ## Design rule
@@ -54,20 +86,33 @@ Code Assist may build authorization requests and propose changes, but it must no
 
 The enforcement boundary is **AGenNext Runner**.
 
+The infrastructure boundary is **AGenNext Kernel**.
+
 Runner should own:
 
 ```text
-- GitHub write tokens / app credentials
-- Git CLI worktree permissions
-- filesystem write permissions
-- network/tool permissions
-- sandbox lifecycle
-- short-lived scoped capabilities
+- scoped capabilities
 - fail-closed behavior
+- AuthZEN decision enforcement
+- runtime guardrails
 - audit trace capture or audit forwarding
+- when and how Kernel primitives may be invoked
 ```
 
-## AuthZEN request flow
+Kernel should own abstractions for:
+
+```text
+- filesystem operations
+- network operations
+- process execution
+- sandbox lifecycle
+- container lifecycle
+- secret access primitives
+- GitHub API / Git CLI backend adapters
+- local / VM / cloud / Kubernetes deployment targets
+```
+
+## AuthZEN and capability request flow
 
 ```text
 1. Code Assist receives user intent.
@@ -76,8 +121,9 @@ Runner should own:
 4. AGenNext Runner builds/sends subject/action/resource/context to an AuthZEN-compatible service.
 5. AuthZEN-compatible service returns allow/deny and reason.
 6. AGenNext Runner enforces the decision.
-7. If allowed, AGenNext Runner performs or grants the operation through GitHub API or Git CLI.
-8. Audit service records the request, decision, operation, and result.
+7. If allowed, AGenNext Runner invokes AGenNext Kernel primitives.
+8. AGenNext Kernel executes the concrete operation through GitHub API, Git CLI, sandbox, container, local runtime, VM, cloud, or Kubernetes target.
+9. Audit service records the request, decision, operation, and result.
 ```
 
 ## Capability request shape
@@ -112,7 +158,8 @@ Runner returns a decision/capability result:
     "repo": "AGenNext/CodeAssist",
     "branch": "code-assist/example",
     "update_mode": "github-api",
-    "max_operations": 10
+    "max_operations": 10,
+    "kernel_backends": ["github-api"]
   }
 }
 ```
@@ -130,6 +177,8 @@ Unknown update path = Runner denies
 Code Assist self-approval = Runner denies
 Expired capability = Runner denies
 Capability constraint mismatch = Runner denies
+Unauthorized Kernel primitive = Runner denies
+Kernel backend unavailable for required operation = Runner denies or fails closed
 ```
 
 ## What Code Assist can do
@@ -151,6 +200,7 @@ Code Assist must not:
 
 - self-authorize privileged actions
 - bypass AGenNext Runner
+- bypass AGenNext Kernel for infrastructure operations
 - own long-lived GitHub write credentials in production
 - mutate repositories outside Runner-approved GitHub API / Git CLI execution paths
 - mark itself production-ready without Runner/gate decisions
@@ -161,15 +211,17 @@ Code Assist must not:
 Use these terms in code and docs:
 
 ```text
-Code Assist Agent / requester
+AGenNext Kernel / infra abstraction layer
 AGenNext Runner / runtime enforcement point
+Code Assist Agent / requester
 AuthZEN Decision Point
 Audit Trace Service
 Repository Operation Backend
 Scoped Capability
+Kernel Primitive
 ```
 
-Avoid describing Code Assist itself as the final enforcer. Local development code may have lightweight guardrail checks, but production enforcement belongs to AGenNext Runner.
+Avoid describing Code Assist itself as the final enforcer. Local development code may have lightweight guardrail checks, but production enforcement belongs to AGenNext Runner, and concrete infrastructure execution belongs behind AGenNext Kernel.
 
 ## Practical deployment
 
@@ -182,7 +234,8 @@ Browser / CLI
   -> Agent ID registry
   -> AuthZEN-compatible authorization service
   -> Audit Trace Service
-  -> GitHub API / Git CLI sandbox
+  -> AGenNext Kernel
+  -> GitHub API / Git CLI / Sandbox / Container / Cloud / Kubernetes backend
 ```
 
-AGenNext Runner owns credentials and execution rights. Code Assist only receives the capabilities Runner grants for that run.
+AGenNext Runner owns capabilities and enforcement. AGenNext Kernel owns infrastructure abstraction. Code Assist only receives the capabilities Runner grants for that run.
