@@ -32,13 +32,16 @@ def build_parser() -> argparse.ArgumentParser:
     run_parser.add_argument("--issue", dest="issue_number", type=int, help="Issue number for default branch naming")
     run_parser.add_argument("--pull", dest="pull_number", type=int, help="Pull request number for metadata/branch naming")
     run_parser.add_argument("--discussion", dest="discussion_number", type=int, help="Discussion number for metadata/branch naming")
-    run_parser.add_argument("--push", action="store_true", help="Push the managed checkout work branch after successful checks")
-    run_parser.add_argument("--open-pr", action="store_true", help="Reserved for future PR creation support; requires --push")
-    run_parser.add_argument("--check", action="append", default=[], help="Post-edit check command to run inside the repo")
+    run_parser.add_argument("--push", action="store_true", help="Request branch push after successful checks; requires --allow-push")
+    run_parser.add_argument("--open-pr", action="store_true", help="Reserved for future PR creation support; requires --allow-pr and --push")
+    run_parser.add_argument("--allow-commits", action="store_true", help="Explicitly allow Aider auto-commits when --auto-commits is used")
+    run_parser.add_argument("--allow-push", action="store_true", help="Explicitly allow pushing the work branch")
+    run_parser.add_argument("--allow-pr", action="store_true", help="Explicitly allow opening a pull request when implemented")
+    run_parser.add_argument("--check", action="append", default=[], help="Post-edit check command or preset to run inside the repo")
     run_parser.add_argument("--file", action="append", default=[], help="File to add to Aider chat")
     run_parser.add_argument("--model", help="Aider/LiteLLM model name")
     run_parser.add_argument("--dry-run", action="store_true", help="Ask Aider to avoid writing files")
-    run_parser.add_argument("--auto-commits", action="store_true", help="Allow Aider to commit edits")
+    run_parser.add_argument("--auto-commits", action="store_true", help="Request Aider commits; requires --allow-commits")
     run_parser.add_argument("--no-auto-yes", action="store_true", help="Do not auto-confirm Aider prompts")
     run_parser.add_argument("--stream", action="store_true", help="Stream model output when supported by Aider")
     run_parser.add_argument("--json", action="store_true", help="Print the full JSON result")
@@ -65,6 +68,9 @@ def run_command(args: argparse.Namespace, settings: Settings) -> int:
             issue_number=args.issue_number,
             pull_number=args.pull_number,
             discussion_number=args.discussion_number,
+            allow_commits=args.allow_commits,
+            allow_push=args.allow_push,
+            allow_pr=args.allow_pr,
             push=args.push,
             open_pr=args.open_pr,
             checks=args.check,
@@ -90,6 +96,10 @@ def run_command(args: argparse.Namespace, settings: Settings) -> int:
             print(f"Repository: {result.repo_path}")
         if result.work_branch:
             print(f"Work branch: {result.work_branch}")
+        if result.anomalies:
+            print("Anomalies:")
+            for anomaly in result.anomalies:
+                print(f"  [{anomaly.severity}] {anomaly.code}: {anomaly.message}")
         if result.changed_files:
             print("Changed files:")
             for path in result.changed_files:
