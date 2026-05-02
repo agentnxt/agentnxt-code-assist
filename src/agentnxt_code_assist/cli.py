@@ -48,6 +48,12 @@ def build_parser() -> argparse.ArgumentParser:
     run_parser.add_argument("--change-log-path", default="CODE_ASSIST_CHANGELOG.md", help="Path for per-run change log inside the target repo")
     run_parser.add_argument("--notify-slack", action="store_true", help="Send optional Slack notification after the run")
     run_parser.add_argument("--slack-webhook-url", help="Slack incoming webhook URL for this run")
+    run_parser.add_argument("--notify-webhook", action="store_true", help="Send optional generic JSON webhook notification after the run")
+    run_parser.add_argument("--webhook-url", help="Generic webhook URL for this run")
+    run_parser.add_argument("--notify-smtp", action="store_true", help="Send optional SMTP email notification after the run")
+    run_parser.add_argument("--smtp-url", help="SMTP URL, for example smtp://user:pass@smtp.example.com:587?starttls=true")
+    run_parser.add_argument("--smtp-from-email", help="Email sender address for SMTP notifications")
+    run_parser.add_argument("--smtp-to-email", help="Email recipient address for SMTP notifications")
     run_parser.add_argument("--file", action="append", default=[], help="File to add to Aider chat")
     run_parser.add_argument("--model", help="Aider/LiteLLM model name")
     run_parser.add_argument("--dry-run", action="store_true", help="Ask Aider to avoid writing files")
@@ -89,6 +95,12 @@ def run_command(args: argparse.Namespace, settings: Settings) -> int:
             change_log_path=args.change_log_path,
             notify_slack=args.notify_slack,
             slack_webhook_url=args.slack_webhook_url,
+            notify_webhook=args.notify_webhook,
+            webhook_url=args.webhook_url,
+            notify_smtp=args.notify_smtp,
+            smtp_url=args.smtp_url,
+            smtp_from_email=args.smtp_from_email,
+            smtp_to_email=args.smtp_to_email,
             allow_commits=args.allow_commits,
             allow_push=args.allow_push,
             allow_pr=args.allow_pr,
@@ -135,6 +147,14 @@ def run_command(args: argparse.Namespace, settings: Settings) -> int:
             print("Slack notification: sent")
         elif result.slack.error:
             print(f"Slack notification error: {result.slack.error}")
+        if result.webhook.sent:
+            print("Webhook notification: sent")
+        elif result.webhook.error:
+            print(f"Webhook notification error: {result.webhook.error}")
+        if result.smtp.sent:
+            print("SMTP notification: sent")
+        elif result.smtp.error:
+            print(f"SMTP notification error: {result.smtp.error}")
         if result.pushed:
             print("Pushed branch: yes")
         if result.error:
