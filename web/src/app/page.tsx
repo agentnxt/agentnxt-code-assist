@@ -17,6 +17,8 @@ const CHECK_PRESETS = [
   'publishable',
 ];
 
+const FORBIDDEN_ENV_KEYS = ['OPENAI_API_KEY', 'GITHUB_TOKEN', 'AWS_SECRET_ACCESS_KEY', 'DATABASE_URL'];
+
 function splitLines(value: string): string[] {
   return value
     .split(/\r?\n|,/)
@@ -33,13 +35,35 @@ function parseEnvVars(value: string): Record<string, string> {
     if (index < 1) throw new Error(`Invalid env var: ${line}`);
     const key = line.slice(0, index).trim();
     if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(key)) throw new Error(`Invalid env var name: ${key}`);
+    if (FORBIDDEN_ENV_KEYS.includes(key)) throw new Error(`Restricted secret key override denied: ${key}`);
     env[key] = line.slice(index + 1);
   }
   return env;
 }
 
+function assertSafeBranch(branch: string, label: string): string {
+  const value = branch.trim();
+  if (!value) return value;
+  if (!/^[A-Za-z0-9._\/-]{2,120}$/.test(value)) {
+    throw new Error(`${label} contains unsupported characters.`);
+  }
+  if (value.includes('..') || value.startsWith('/') || value.endsWith('/')) {
+    throw new Error(`${label} failed validation.`);
+  }
+  return value;
+}
+
+function assertSafeFiles(files: string[]): string[] {
+  return files.map((file) => {
+    if (!/^[A-Za-z0-9._\/-]{1,200}$/.test(file)) throw new Error(`Unsafe file path: ${file}`);
+    if (file.includes('..') || file.startsWith('/')) throw new Error(`Path traversal denied: ${file}`);
+    return file;
+  });
+}
+
 export default function HomePage() {
   const [instruction, setInstruction] = useState('');
+  const [tenantId, setTenantId] = useState('acme-prod');
   const [targetUrl, setTargetUrl] = useState('https://github.com/AGenNext/Platform/issues/1');
   const [repoPath, setRepoPath] = useState('');
   const [workBranch, setWorkBranch] = useState('code-assist/issue-1-phase-1');
@@ -74,12 +98,19 @@ export default function HomePage() {
     setResult(null);
 
     try {
+      const parsedFiles = assertSafeFiles(splitLines(files));
+      const branch = assertSafeBranch(workBranch, 'Work branch');
+      const tenant = tenantId.trim();
+      if (!/^[a-z0-9][a-z0-9-]{1,40}$/.test(tenant)) {
+        throw new Error('Tenant ID must be kebab-case and 2-41 chars.');
+      }
+
       const request = {
-        instruction,
+        instruction: `[tenant:${tenant}] ${instruction}`,
         target_url: targetUrl.trim() || undefined,
         repo_path: targetUrl.trim() ? undefined : repoPath.trim() || undefined,
-        work_branch: workBranch.trim() || undefined,
-        files: splitLines(files),
+        work_branch: branch || undefined,
+        files: parsedFiles,
         checks,
         model: model.trim() || null,
         env_vars: parseEnvVars(envVars),
@@ -114,10 +145,10 @@ export default function HomePage() {
       <section className="hero">
         <div>
           <p className="eyebrow">AGenNext Code Assist</p>
-          <h1>Chat with a repo, run production checks, and review before pushing.</h1>
+          <h1>Enterprise-grade Next.js operator console for multi-tenant SaaS workflows.</h1>
           <p>
-            Optional Next.js operator UI for the FastAPI backend. Safety defaults stay enforced: no commit,
-            push, PR, or merge unless explicitly authorized.
+            Hardened defaults: tenant scoping, strict branch and path validation, and restricted secret
+            overrides. Commit, push, and PR actions still require explicit authorization.
           </p>
         </div>
         <div className="status-card">
@@ -128,6 +159,16 @@ export default function HomePage() {
 
       <form className="grid" onSubmit={onSubmit}>
         <section className="panel main-panel">
+          <label>
+            Tenant ID
+            <input
+              value={tenantId}
+              onChange={(event) => setTenantId(event.target.value)}
+              placeholder="acme-prod"
+              required
+            />
+          </label>
+
           <label>
             Instruction
             <textarea
