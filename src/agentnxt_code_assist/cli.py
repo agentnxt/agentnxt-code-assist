@@ -1,4 +1,4 @@
-"""Command line interface for AgentNXT Code Assist."""
+"""Command line interface for AGenNext Code Assist."""
 
 from __future__ import annotations
 
@@ -9,11 +9,12 @@ import uvicorn
 
 from agentnxt_code_assist.aider_runner import AiderCodeAssist
 from agentnxt_code_assist.config import Settings
+from agentnxt_code_assist.ports import find_available_port
 from agentnxt_code_assist.schemas import AssistRequest
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="agentnxt-code-assist")
+    parser = argparse.ArgumentParser(prog="agennext-code-assist")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     run_parser = subparsers.add_parser("run", help="Run one code-assist instruction")
@@ -57,7 +58,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     serve_parser = subparsers.add_parser("serve", help="Start the HTTP API")
     serve_parser.add_argument("--host", help="Bind host")
-    serve_parser.add_argument("--port", type=int, help="Bind port")
+    serve_parser.add_argument("--port", type=int, help="Preferred bind port")
+    serve_parser.add_argument("--fixed-port", action="store_true", help="Fail if the preferred port is unavailable")
+    serve_parser.add_argument("--port-scan-limit", type=int, default=100, help="Number of sequential ports to scan")
 
     return parser
 
@@ -142,7 +145,15 @@ def run_command(args: argparse.Namespace, settings: Settings) -> int:
 
 def serve_command(args: argparse.Namespace, settings: Settings) -> int:
     host = args.host or settings.host
-    port = args.port or settings.port
+    preferred_port = args.port or settings.port
+    port = preferred_port if args.fixed_port else find_available_port(
+        host,
+        preferred_port,
+        max_attempts=args.port_scan_limit,
+    )
+    if port != preferred_port:
+        print(f"Preferred port {preferred_port} is unavailable; using {port}.")
+    print(f"AGenNext Code Assist API listening on http://{host}:{port}")
     uvicorn.run("agentnxt_code_assist.server:app", host=host, port=port, reload=False)
     return 0
 
