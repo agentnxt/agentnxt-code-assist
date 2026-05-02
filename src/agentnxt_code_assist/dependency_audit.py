@@ -22,13 +22,14 @@ def audit_dependencies(repo_path: Path, *, check_upstream: bool = False) -> list
     anomalies: list[DependencyAnomaly] = []
     _audit_node_project(repo_path, anomalies, check_upstream=check_upstream)
     _audit_python_project(repo_path, anomalies, check_upstream=check_upstream)
+    _audit_docker_publishability(repo_path, anomalies)
     return anomalies
 
 
 def dependency_anomalies_to_prompt_block(anomalies: list[DependencyAnomaly]) -> str:
     if not anomalies:
-        return "Dependency audit: no obvious dependency/version anomalies found."
-    lines = ["Dependency/version audit anomalies:"]
+        return "Dependency/version/publishability audit: no obvious anomalies found."
+    lines = ["Dependency/version/publishability audit anomalies:"]
     for anomaly in anomalies:
         evidence = f" Evidence: {anomaly.evidence}" if anomaly.evidence else ""
         lines.append(f"- [{anomaly.severity}] {anomaly.code}: {anomaly.message}{evidence}")
@@ -49,25 +50,11 @@ def _audit_node_project(repo_path: Path, anomalies: list[DependencyAnomaly], *, 
         anomalies.append(DependencyAnomaly("warning", "missing_package_scripts", "package.json has no scripts object."))
 
     all_deps = _node_dependencies(package)
-    lockfiles = ["package-lock.json", "pnpm-lock.yaml", "yarn.lock", "bun.lockb"]
-    present_lockfiles = [name for name in lockfiles if (repo_path / name).exists()]
+    present_lockfiles = [name for name in ["package-lock.json", "pnpm-lock.yaml", "yarn.lock", "bun.lockb"] if (repo_path / name).exists()]
     if len(present_lockfiles) > 1:
-        anomalies.append(
-            DependencyAnomaly(
-                "warning",
-                "multiple_node_lockfiles",
-                "Multiple Node lockfiles are present; package manager may be ambiguous.",
-                ", ".join(present_lockfiles),
-            )
-        )
+        anomalies.append(DependencyAnomaly("warning", "multiple_node_lockfiles", "Multiple Node lockfiles are present; package manager may be ambiguous.", ", ".join(present_lockfiles)))
     if all_deps and not present_lockfiles:
-        anomalies.append(
-            DependencyAnomaly(
-                "warning",
-                "missing_node_lockfile",
-                "package.json declares dependencies but no Node lockfile was found.",
-            )
-        )
+        anomalies.append(DependencyAnomaly("warning", "missing_node_lockfile", "package.json declares dependencies but no Node lockfile was found."))
 
     package_lock = repo_path / "package-lock.json"
     if package_lock.exists():
@@ -75,32 +62,16 @@ def _audit_node_project(repo_path: Path, anomalies: list[DependencyAnomaly], *, 
         packages = lock.get("packages") if isinstance(lock, dict) else None
         root_package = packages.get("") if isinstance(packages, dict) else None
         if isinstance(root_package, dict):
-            lock_deps = set((root_package.get("dependencies") or {}).keys()) | set(
-                (root_package.get("devDependencies") or {}).keys()
-            )
+            lock_deps = set((root_package.get("dependencies") or {}).keys()) | set((root_package.get("devDependencies") or {}).keys())
             missing_in_lock = sorted(set(all_deps.keys()) - lock_deps)
             if missing_in_lock:
-                anomalies.append(
-                    DependencyAnomaly(
-                        "warning",
-                        "package_lock_missing_declared_deps",
-                        "package-lock root metadata is missing dependencies declared in package.json.",
-                        ", ".join(missing_in_lock[:20]),
-                    )
-                )
+                anomalies.append(DependencyAnomaly("warning", "package_lock_missing_declared_deps", "package-lock root metadata is missing dependencies declared in package.json.", ", ".join(missing_in_lock[:20])))
 
     if check_upstream:
         for name, spec in sorted(all_deps.items())[:80]:
             latest = _npm_latest(name)
-            if latest and _looks_pinned_or_range(spec) and latest not in str(spec):
-                anomalies.append(
-                    DependencyAnomaly(
-                        "info",
-                        "npm_upstream_version_available",
-                        f"npm package `{name}` has upstream latest `{latest}` while package.json declares `{spec}`.",
-                        name,
-                    )
-                )
+            if latest and _looks_registry_spec(spec) and latest not in str(spec):
+                anomalies.append(DependencyAnomaly("info", "npm_upstream_version_available", f"npm package `{name}` has upstream latest `{latest}` while package.json declares `{spec}`.", name))
 
 
 def _audit_python_project(repo_path: Path, anomalies: list[DependencyAnomaly], *, check_upstream: bool) -> None:
@@ -112,16 +83,9 @@ def _audit_python_project(repo_path: Path, anomalies: list[DependencyAnomaly], *
     if pyproject_path.exists() and not _read_text(pyproject_path):
         anomalies.append(DependencyAnomaly("error", "empty_pyproject", "pyproject.toml exists but could not be read."))
 
-    lockfiles = ["uv.lock", "poetry.lock", "Pipfile.lock"]
-    present_lockfiles = [name for name in lockfiles if (repo_path / name).exists()]
+    present_lockfiles = [name for name in ["uv.lock", "poetry.lock", "Pipfile.lock"] if (repo_path / name).exists()]
     if pyproject_path.exists() and not present_lockfiles:
-        anomalies.append(
-            DependencyAnomaly(
-                "info",
-                "missing_python_lockfile",
-                "Python project metadata exists but no common Python lockfile was found.",
-            )
-        )
+        anomalies.append(DependencyAnomaly("info", "missing_python_lockfile", "Python project metadata exists but no common Python lockfile was found."))
 
     if requirements_path.exists() and check_upstream:
         for line in requirements_path.read_text(encoding="utf-8").splitlines()[:100]:
@@ -130,14 +94,33 @@ def _audit_python_project(repo_path: Path, anomalies: list[DependencyAnomaly], *
                 continue
             latest = _pypi_latest(name)
             if latest and latest not in line:
-                anomalies.append(
-                    DependencyAnomaly(
-                        "info",
-                        "pypi_upstream_version_available",
-                        f"PyPI package `{name}` has upstream latest `{latest}` while requirements declares `{line}`.",
-                        name,
-                    )
-                )
+                anomalies.append(DependencyAnomaly("info", "pypi_upstream_version_available", f"PyPI package `{name}` has upstream latest `{latest}` while requirements declares `{line}`.", name))
+
+
+def _audit_docker_publishability(repo_path: Path, anomalies: list[DependencyAnomaly]) -> None:
+    dockerfile = repo_path / "Dockerfile"
+    if not dockerfile.exists():
+        anomalies.append(DependencyAnomaly("warning", "missing_dockerfile", "Repository has no Dockerfile, so it is not directly publishable to Docker Hub/GHCR."))
+        return
+    text = _read_text(dockerfile) or ""
+    upper = text.upper()
+    if "HEALTHCHECK" not in upper:
+        anomalies.append(DependencyAnomaly("info", "dockerfile_missing_healthcheck", "Dockerfile has no HEALTHCHECK. Add one for production runtime images when applicable."))
+    if "USER " not in upper:
+        anomalies.append(DependencyAnomaly("warning", "dockerfile_runs_as_root", "Dockerfile does not set a non-root USER."))
+    if ":latest" in text:
+        anomalies.append(DependencyAnomaly("warning", "dockerfile_uses_latest_tag", "Dockerfile references a :latest image tag; pin base images for reproducible production builds."))
+
+    workflows = repo_path / ".github" / "workflows"
+    if not workflows.exists():
+        anomalies.append(DependencyAnomaly("warning", "missing_publish_workflow", "No GitHub Actions workflow directory found for Docker Hub/GHCR publishing."))
+        return
+    workflow_text = "\n".join(_read_text(path) or "" for path in workflows.glob("*.y*ml"))
+    lower = workflow_text.lower()
+    if "ghcr.io" not in lower:
+        anomalies.append(DependencyAnomaly("warning", "missing_ghcr_publish_config", "No GHCR publish reference found in GitHub Actions workflows."))
+    if "docker.io" not in lower and "dockerhub" not in lower and "docker/login-action" not in lower:
+        anomalies.append(DependencyAnomaly("warning", "missing_dockerhub_publish_config", "No Docker Hub publish/login reference found in GitHub Actions workflows."))
 
 
 def _node_dependencies(package: dict[str, Any]) -> dict[str, str]:
@@ -149,7 +132,7 @@ def _node_dependencies(package: dict[str, Any]) -> dict[str, str]:
     return deps
 
 
-def _looks_pinned_or_range(spec: str) -> bool:
+def _looks_registry_spec(spec: str) -> bool:
     return bool(spec and not spec.startswith(("file:", "workspace:", "link:", "git+", "github:")))
 
 
