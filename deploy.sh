@@ -1,5 +1,5 @@
 #!/bin/bash
-# Deploy AgentNXT Code Assist
+# Deploy AGenNext Code Assist
 # Usage: ./deploy.sh [--skip-build]
 
 set -e
@@ -9,7 +9,7 @@ if [ "$1" == "--skip-build" ]; then
   SKIP_BUILD=true
 fi
 
-echo "=== Deploying AgentNXT Code Assist ==="
+echo "=== Deploying AGenNext Code Assist ==="
 
 # Build if not skipped
 if [ "$SKIP_BUILD" == "false" ]; then
