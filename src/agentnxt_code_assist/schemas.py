@@ -29,6 +29,12 @@ class NotificationResult(BaseModel):
 
 
 class AssistRequest(BaseModel):
+    run_mode: str = "dry_run"
+    requested_capabilities: list[str] = Field(default_factory=list)
+    runner_run_id: str | None = None
+    runner_capability_id: str | None = None
+    audit_trace_id: str | None = None
+
     instruction: str = Field(min_length=1)
     repo_path: Path | None = None
     repo_url: str | None = None
@@ -118,6 +124,10 @@ class AssistRequest(BaseModel):
             self.work_branch = f"code-assist/{suffix}"
         if self.work_branch in {"main", "master", self.base_branch}:
             raise ValueError("work_branch must not be the base branch")
+        if self.run_mode not in {"dry_run", "proposed_change", "production_change"}:
+            raise ValueError("run_mode must be dry_run, proposed_change, or production_change")
+        if self.run_mode == "dry_run" and (self.push or self.open_pr or self.allow_commits):
+            raise ValueError("dry_run cannot request push/pr/commits")
         if self.auto_commits and not self.allow_commits:
             raise ValueError("auto_commits requires allow_commits=true")
         if self.push and not self.allow_push:
@@ -141,6 +151,13 @@ class AssistRequest(BaseModel):
 
 class AssistResult(BaseModel):
     ok: bool
+    status: str = "ok"
+    run_id: str | None = None
+    capability_id: str | None = None
+    warnings: list[str] = Field(default_factory=list)
+    next_steps: list[str] = Field(default_factory=list)
+    audit_trace_json: str | None = None
+    audit_trace_md: str | None = None
     repo_path: str
     files: list[str]
     changed_files: list[str] = Field(default_factory=list)

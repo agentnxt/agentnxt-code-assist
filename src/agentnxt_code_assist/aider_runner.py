@@ -30,6 +30,8 @@ from agentnxt_code_assist.git_workspace import (
 )
 from agentnxt_code_assist.memory_store import append_memory, memory_prompt_block, read_memory
 from agentnxt_code_assist.rag_knowledge import load_rag_context
+from agentnxt_code_assist.runner_client import RunnerClient
+from agentnxt_code_assist.audit_trace import write_audit_trace
 from agentnxt_code_assist.repo_audit import audit_repo
 from agentnxt_code_assist.schemas import AssistRequest, AssistResult, CheckResult, NotificationResult, RepoAnomalyResult
 from agentnxt_code_assist.skill_registry import skill_prompt_block
@@ -67,6 +69,29 @@ class AiderCodeAssist:
             memory_context,
             rag_context,
         )
+
+        run_id = request.runner_run_id or f"run-{os.getpid()}-{threading.get_ident()}"
+        runner_decision = None
+        if request.run_mode == "production_change":
+            payload = {"agent":"agennext-code-assist","action":"repo.write","resource":f"repository:{request.repo_full_name or repo_path.name}","branch":request.work_branch,"reason":"implement requested code change","requested_update_mode":"github-api","context":{"run_id":run_id}}
+            runner_decision = RunnerClient().request_capability(payload)
+            if not runner_decision.allowed:
+                result = self._result(request=request, repo_path=repo_path, files=files, output=output.getvalue(), error=runner_decision.reason or "runner denied capability", before_sha=before_sha, checks=checks, anomalies=anomalies, pushed=pushed, ok=False, hydrated_context=hydrated_context, rag_context=rag_context)
+                result.status="denied"
+                result.run_id=run_id
+                result.capability_id=runner_decision.capability_id
+                result.run_id = run_id
+            if runner_decision:
+                result.capability_id = runner_decision.capability_id
+            if request.run_mode == "production_change":
+                try:
+                    j,m=write_audit_trace(repo_path, run_id, {"run_mode": request.run_mode, "repo_target": request.repo_full_name or str(repo_path), "base_branch": request.base_branch, "work_branch": request.work_branch, "result": "ok" if result.ok else "failed", "changed_files": result.changed_files})
+                    result.audit_trace_json=j
+                    result.audit_trace_md=m
+                except Exception as exc:
+                    result.ok=False
+                    result.error=result.error or f"audit trace write failed: {exc}"
+            return self._finalize(request, repo_path, result)
 
         try:
             if self._fails_anomaly_gate(anomalies, request.fail_on_anomaly_severity):
