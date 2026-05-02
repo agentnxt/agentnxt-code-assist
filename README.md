@@ -1,6 +1,6 @@
-# AgentNXT Code Assist
+# AGenNext Code Assist
 
-AgentNXT Code Assist is a small service and CLI that wraps Aider's Python scripting API for focused code changes inside a target repository.
+AGenNext Code Assist is a small service, CLI, and optional web UI that wraps Aider's Python scripting API for focused code changes inside a target repository.
 
 It can:
 
@@ -16,9 +16,50 @@ It can:
 - write a per-run `CODE_ASSIST_CHANGELOG.md` entry with objective, actions, checks, anomalies, and next steps
 - optionally notify Slack after a run
 - expose the same behavior through a FastAPI endpoint
+- provide an optional Next.js chat UI for operators
 - support dry runs, automatic confirmations, optional Aider auto-commits, and optional branch push
 
 The Aider Python scripting API is documented by Aider as useful but not a stable compatibility contract, so the wrapper keeps Aider usage isolated in one module.
+
+---
+
+## Distribution modes
+
+| Mode | Command / entry point | Purpose |
+|---|---|---|
+| Python CLI | `agennext-code-assist run ...` | Local/operator coding tasks |
+| FastAPI backend | `agennext-code-assist serve ...` | HTTP API for automation and UIs |
+| Static fallback UI | `GET /` from FastAPI | Minimal bundled UI for local testing |
+| Optional Next.js UI | `cd web && npm run dev` | Rich chat/operator UI |
+| Docker backend | root `Dockerfile` | Backend container |
+| Docker Compose | `docker compose up -d` | Backend local deployment |
+| Docker Compose + web | `docker compose --profile web up -d` | Backend + Next.js UI locally |
+| Cloud Run | GitHub Actions workflow | Managed backend deployment |
+| GHCR/Docker Hub | CI/CD after approval | Publishable image targets, not pushed by Code Assist |
+
+Primary CLI:
+
+```bash
+agennext-code-assist
+```
+
+Backward-compatible alias:
+
+```bash
+agentnxt-code-assist
+```
+
+Primary environment prefix:
+
+```env
+AGENNEXT_CODE_ASSIST_*
+```
+
+Backward-compatible legacy prefix:
+
+```env
+AGENTNXT_CODE_ASSIST_*
+```
 
 ---
 
@@ -67,7 +108,7 @@ Set the provider API key in `.env`, then run a task.
 Use this when the target repo already exists on disk:
 
 ```bash
-.venv/bin/agentnxt-code-assist run \
+.venv/bin/agennext-code-assist run \
   "add input validation to the login handler" \
   --repo /path/to/repo \
   --file app/auth.py
@@ -76,7 +117,7 @@ Use this when the target repo already exists on disk:
 Use `--dry-run` to ask Aider for the patch without writing files:
 
 ```bash
-.venv/bin/agentnxt-code-assist run \
+.venv/bin/agennext-code-assist run \
   "explain and simplify this module" \
   --repo /path/to/repo \
   --file app/service.py \
@@ -90,7 +131,7 @@ Use `--dry-run` to ask Aider for the patch without writing files:
 Use this when Code Assist should clone/fetch the target repo itself.
 
 ```bash
-.venv/bin/agentnxt-code-assist run \
+.venv/bin/agennext-code-assist run \
   "Phase 1 only: fix app shell/build issues" \
   --repo-url https://github.com/AGenNext/Platform.git \
   --base-branch main \
@@ -104,7 +145,7 @@ Use this when Code Assist should clone/fetch the target repo itself.
 You can also use a GitHub full name:
 
 ```bash
-.venv/bin/agentnxt-code-assist run \
+.venv/bin/agennext-code-assist run \
   "Phase 1 only: fix app shell/build issues" \
   --repo-full-name AGenNext/Platform \
   --base-branch main \
@@ -142,7 +183,7 @@ https://github.com/AGenNext/Platform/discussions/3
 Examples:
 
 ```bash
-.venv/bin/agentnxt-code-assist run \
+.venv/bin/agennext-code-assist run \
   "Implement the first phase described in this issue. Keep the change focused." \
   --target-url https://github.com/AGenNext/Platform/issues/1 \
   --work-branch code-assist/issue-1-phase-1 \
@@ -156,7 +197,7 @@ Examples:
 Branch URL example:
 
 ```bash
-.venv/bin/agentnxt-code-assist run \
+.venv/bin/agennext-code-assist run \
   "Update this branch with a focused fix" \
   --target-url https://github.com/AGenNext/Platform/tree/main \
   --work-branch code-assist/focused-fix
@@ -165,13 +206,78 @@ Branch URL example:
 Pull request URL example:
 
 ```bash
-.venv/bin/agentnxt-code-assist run \
+.venv/bin/agennext-code-assist run \
   "Address the review feedback for this pull request" \
   --target-url https://github.com/AGenNext/Platform/pull/12 \
   --work-branch code-assist/pr-12-followup
 ```
 
 Issue and PR URLs hydrate title/body/state into the coding instruction. Discussion URLs currently resolve metadata but still require the relevant discussion text to be pasted into the instruction.
+
+---
+
+## Optional Next.js chat UI
+
+The rich web UI lives in:
+
+```text
+web/
+```
+
+Run the backend:
+
+```bash
+.venv/bin/agennext-code-assist serve --host 127.0.0.1 --port 8090
+```
+
+Run the web UI:
+
+```bash
+cd web
+npm install
+NEXT_PUBLIC_AGENNEXT_CODE_ASSIST_API_URL=http://localhost:8090 npm run dev
+```
+
+Open:
+
+```text
+http://localhost:3000
+```
+
+The Next.js UI supports:
+
+- chat-style instruction input
+- target URL or local repo path
+- work branch
+- file list
+- check presets
+- dry-run toggle
+- upstream dependency check toggle
+- Slack notification toggle
+- commit/push/PR guardrail toggles, all off by default
+- changed files
+- check results
+- anomaly report
+- change log preview
+- raw output
+
+Run backend + web with Docker Compose:
+
+```bash
+docker compose --profile web up -d --build
+```
+
+Backend:
+
+```text
+http://localhost:8090
+```
+
+Web UI:
+
+```text
+http://localhost:3000
+```
 
 ---
 
@@ -198,7 +304,7 @@ Presets:
 Example:
 
 ```bash
-.venv/bin/agentnxt-code-assist run \
+.venv/bin/agennext-code-assist run \
   "Make this repo production-ready and flag anything blocking publishing" \
   --target-url https://github.com/AGenNext/Platform/issues/1 \
   --work-branch code-assist/issue-1-production-readiness \
@@ -272,13 +378,13 @@ Slack is optional and disabled by default.
 Configure a webhook:
 
 ```env
-AGENTNXT_CODE_ASSIST_SLACK_WEBHOOK_URL=https://hooks.slack.com/services/...
+AGENNEXT_CODE_ASSIST_SLACK_WEBHOOK_URL=https://hooks.slack.com/services/...
 ```
 
 Send a notification for one run:
 
 ```bash
-.venv/bin/agentnxt-code-assist run \
+.venv/bin/agennext-code-assist run \
   "Phase 1 only: fix app shell/build issues" \
   --target-url https://github.com/AGenNext/Platform/issues/1 \
   --work-branch code-assist/issue-1-phase-1 \
@@ -289,7 +395,7 @@ Send a notification for one run:
 Or enable globally:
 
 ```env
-AGENTNXT_CODE_ASSIST_ENABLE_SLACK=true
+AGENNEXT_CODE_ASSIST_ENABLE_SLACK=true
 ```
 
 Slack notifications include status, repo, branch, changed-file count, failed-check count, anomaly count, and whether anything was pushed.
@@ -321,7 +427,7 @@ one instruction -> one phase -> one branch -> checks -> review -> next phase
 Start the server:
 
 ```bash
-.venv/bin/agentnxt-code-assist serve --host 127.0.0.1 --port 8090
+.venv/bin/agennext-code-assist serve --host 127.0.0.1 --port 8090
 ```
 
 Call it with local checkout mode:
@@ -366,18 +472,20 @@ Environment variables:
 
 | Variable | Default | Purpose |
 |---|---:|---|
-| `AGENTNXT_CODE_ASSIST_MODEL` | `gpt-4o` | Model name passed to Aider/LiteLLM |
-| `AGENTNXT_CODE_ASSIST_AUTO_YES` | `true` | Auto-confirm Aider prompts |
-| `AGENTNXT_CODE_ASSIST_AUTO_COMMITS` | `false` | Let Aider commit its edits, still requires explicit request authorization |
-| `AGENTNXT_CODE_ASSIST_DRY_RUN` | `false` | Run without writing files |
-| `AGENTNXT_CODE_ASSIST_HOST` | `127.0.0.1` | API host |
-| `AGENTNXT_CODE_ASSIST_PORT` | `8090` | API port |
-| `AGENTNXT_CODE_ASSIST_WORKSPACE` | `/srv/agennext/code-assist/workspaces` | Managed checkout workspace root |
-| `AGENTNXT_CODE_ASSIST_GIT_USER_NAME` | `agennext-code-assist` | Git author name for managed checkouts |
-| `AGENTNXT_CODE_ASSIST_GIT_USER_EMAIL` | `code-assist@agennext.local` | Git author email for managed checkouts |
-| `AGENTNXT_CODE_ASSIST_ENABLE_SLACK` | `false` | Enable Slack notification for all runs |
-| `AGENTNXT_CODE_ASSIST_SLACK_WEBHOOK_URL` | unset | Slack incoming webhook URL |
+| `AGENNEXT_CODE_ASSIST_MODEL` | `gpt-4o` | Model name passed to Aider/LiteLLM |
+| `AGENNEXT_CODE_ASSIST_AUTO_YES` | `true` | Auto-confirm Aider prompts |
+| `AGENNEXT_CODE_ASSIST_AUTO_COMMITS` | `false` | Let Aider commit its edits, still requires explicit request authorization |
+| `AGENNEXT_CODE_ASSIST_DRY_RUN` | `false` | Run without writing files |
+| `AGENNEXT_CODE_ASSIST_HOST` | `127.0.0.1` | API host |
+| `AGENNEXT_CODE_ASSIST_PORT` | `8090` | API port |
+| `AGENNEXT_CODE_ASSIST_WORKSPACE` | `/srv/agennext/code-assist/workspaces` | Managed checkout workspace root |
+| `AGENNEXT_CODE_ASSIST_GIT_USER_NAME` | `agennext-code-assist` | Git author name for managed checkouts |
+| `AGENNEXT_CODE_ASSIST_GIT_USER_EMAIL` | `code-assist@agennext.local` | Git author email for managed checkouts |
+| `AGENNEXT_CODE_ASSIST_ENABLE_SLACK` | `false` | Enable Slack notification for all runs |
+| `AGENNEXT_CODE_ASSIST_SLACK_WEBHOOK_URL` | unset | Slack incoming webhook URL |
 | `GITHUB_TOKEN` | unset | Optional token for private repos and pushing HTTPS branches |
+
+Legacy `AGENTNXT_CODE_ASSIST_*` variables are still accepted as compatibility fallbacks.
 
 Provider credentials such as `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, and OpenAI-compatible gateway variables are read by Aider/LiteLLM.
 
