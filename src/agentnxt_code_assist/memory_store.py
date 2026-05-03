@@ -99,3 +99,66 @@ def _sanitize(value: str) -> str:
         else:
             lines.append(line)
     return "\n".join(lines)
+
+
+# === Memory Compaction ===
+
+_MAX_MEMORY_BYTES = 100_000
+_SUMMARY_MAX_CHARS = 2_000
+
+
+def compact_memory(repo_path: Path, relative_path: str = _DEFAULT_MEMORY_PATH) -> int:
+    """Compress memory if it exceeds MAX_MEMORY_BYTES.
+    
+    Returns number of entries removed, 0 if no compaction needed.
+    """
+    memory_path = _safe_path(repo_path, relative_path)
+    if not memory_path.exists():
+        return 0
+    
+    size = memory_path.stat().st_size
+    if size < _MAX_MEMORY_BYTES:
+        return 0
+    
+    # Read existing memory
+    text = memory_path.read_text(encoding="utf-8")
+    entries = text.split("### Run at ")
+    
+    if len(entries) <= 2:
+        return 0  # Can't compact much
+    
+    # Keep first entry (header) + last 10 runs
+    kept = ["### Run at ".join(entries[:1] + entries[-10:])]
+    summary = f"\n\n### Earlier runs summarized ({len(entries) - 11} runs omitted)\n"
+    summary += f"- Previous runs truncated for brevity. Full audit traces in `.agennext/audit/runs/`\n"
+    kept.append(summary)
+    
+    compacted = "### Run at ".join(kept)
+    memory_path.write_text(compacted, encoding="utf-8")
+    
+    removed = len(entries) - 11
+    print(f"Memory compacted: {removed} earlier runs omitted")
+    return removed
+
+
+def summarize_memory_entries(entries: list[str]) -> str:
+    """Create condensed summary of memory entries.
+    
+    Extracts operation types and outcomes without full context.
+    """
+    if not entries:
+        return "No previous runs."
+    
+    ops: list[str] = []
+    for entry in entries[:20]:  # Last 20 runs
+        lines = entry.splitlines()
+        for line in lines:
+            if line.startswith("- "):
+                ops.append(line[:100])  # Truncate long details
+        if len(ops) >= 10:
+            break
+    
+    summary = f"### Last {len(ops)} operations"
+    if ops:
+        summary += "\n" + "\n".join(ops)
+    return summary
