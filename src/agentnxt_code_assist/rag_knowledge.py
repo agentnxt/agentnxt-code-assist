@@ -128,3 +128,135 @@ def _load_remote(url: str, *, query: str) -> RagSourceResult | None:
             if parts:
                 return RagSourceResult(source=url, content="\n\n".join(parts))
     return None
+
+
+# === Cloud RAG Backend Integration ===
+
+_CLOUD_RAG_ENDPOINTS = {
+    "openai": "https://api.openai.com/v1/rag/retrieve",
+    "anthropic": "https://api.anthropic.com/v1/rag",
+    "custom": None,  # Set via RAG_API_BASE env var
+}
+
+
+def get_rag_endpoint() -> str | None:
+    """Get the configured RAG API endpoint."""
+    custom = _CLOUD_RAG_ENDPOINTS.get("custom")
+    if custom:
+        return custom
+    # Default to custom env var if set
+    return __import__("os").getenv("RAG_API_BASE") or _CLOUD_RAG_ENDPOINTS.get("openai")
+
+
+def query_cloud_rag(
+    query: str,
+    *,
+    repo_name: str | None = None,
+    top_k: int = 4,
+    filter_tags: list[str] | None,
+) -> list[str]:
+    """Query cloud RAG backend for relevant knowledge.
+    
+    Args:
+        query: Search query string
+        repo_name: Optional repository name to filter by
+        top_k: Number of results to return
+        filter_tags: Optional tags to filter by
+    
+    Returns:
+        List of relevant knowledge snippets
+    """
+    import os
+    endpoint = get_rag_endpoint()
+    if not endpoint:
+        return []
+    
+    payload: dict[str, Any] = {
+        "query": query,
+        "top_k": top_k,
+    }
+    if repo_name:
+        payload["repo_name"] = repo_name
+    if filter_tags:
+        payload["filters"] = {"tags": filter_tags}
+    
+    api_key = os.getenv("OPENAI_API_KEY") or os.getenv("ANTHROPIC_API_KEY")
+    headers = {
+        "Content-Type": "application/json",
+        "User-Agent": "agennext-code-assist",
+    }
+    if api_key:
+        headers["Authorization"] = f"Bearer {api_key}"
+    
+    request = urllib.request.Request(
+        endpoint,
+        data=json.dumps(payload).encode("utf-8"),
+        headers=headers,
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=15) as response:
+            data = json.loads(response.read().decode("utf-8"))
+    except (urllib.error.URLError, TimeoutError, json.JSONDecodeError):
+        return []
+    
+    results: list[str] = []
+    items = data.get("results") or data.get("documents") or data.get("chunks") or []
+    if isinstance(items, list):
+        for item in items[:top_k]:
+            if isinstance(item, str):
+                results.append(item)
+            elif isinstance(item, dict):
+                text = item.get("content") or item.get("text") or item.get("snippet")
+                if isinstance(text, str) and text.strip():
+                    results.append(text)
+    return results
+
+
+# === Cross-Repo Memory ===
+
+_CROSS_REPO_MEMORY_PATHS = [
+    ".agennext/memory.md",
+    ".agennext/audit/index.ndjson",
+]
+
+
+def load_cross_repo_memory(
+    workspace_root: Path,
+    repo_name: str,
+    query: str | None = None,
+) -> list[RagSourceResult]:
+    """Load memory from other repos in the workspace.
+    
+    Useful for cross-repo context and tribal knowledge.
+    """
+    results: list[RagSourceResult] = []
+    if not workspace_root.exists():
+        return results
+    
+    for other in workspace_root.iterdir():
+        if not other.is_dir() or other.name == repo_name:
+            continue
+        if other.name.startswith("."):
+            continue
+        
+        for mem_path in _CROSS_REPO_MEMORY_PATHS:
+            mem_file = other / mem_path
+            if not mem_file.exists():
+                continue
+            
+            try:
+                text = mem_file.read_text(encoding="utf-8")
+            except (OSError, UnicodeDecodeError):
+                continue
+            
+            # If query provided, filter entries
+            if query and query.lower() not in text.lower():
+                continue
+            
+            results.append(RagSourceResult(
+                source=f"{other.name}/{mem_path}",
+                content=text[:5000],  # Limit each to 5KB
+            ))
+    
+    return results[:5]  # Max 5 cross-repo sources

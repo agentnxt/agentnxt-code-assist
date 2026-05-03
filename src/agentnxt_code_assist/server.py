@@ -217,3 +217,62 @@ async def run_local(prompt: dict[str, str]) -> dict[str, str]:
 def get_local_help() -> dict[str, str]:
     """Get fallback setup instructions."""
     return {"instructions": get_fallback_instructions()}
+
+
+# === RAG/Memory API ===
+
+from agentnxt_code_assist.memory_store import compact_memory as compact_repo_memory, read_memory, append_memory
+from agentnxt_code_assist.rag_knowledge import query_cloud_rag, load_cross_repo_memory, get_rag_endpoint
+
+
+@app.get("/memory/{repo_id}")
+def get_repo_memory(repo_id: str) -> dict[str, str | None]:
+    """Get memory for a repository."""
+    from pathlib import Path
+    repo_path = Path("/ srv/agennext/repos") / repo_id
+    memory = read_memory(repo_path) if repo_path.exists() else None
+    return {"repo": repo_id, "memory": memory}
+
+
+@app.post("/memory/{repo_id}")
+def add_to_memory(repo_id: str, result: dict[str, Any]) -> dict[str, str]:
+    """Append to repository memory."""
+    from pathlib import Path
+    from agentnxt_code_assist.schemas import AssistResult
+    repo_path = Path("/srv/agennext/repos") / repo_id
+    if not repo_path.exists():
+        raise HTTPException(status_code=404, detail="Repository not found")
+    try:
+        path = append_memory(repo_path, ".agennext/memory.md", AssistResult(**result))
+        return {"repo": repo_id, "path": str(path)}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/memory/{repo_id}/compact")
+def compress_memory(repo_id: str) -> dict[str, int]:
+    """Compress repository memory."""
+    from pathlib import Path
+    repo_path = Path("/srv/agennext/repos") / repo_id
+    if not repo_path.exists():
+        raise HTTPException(status_code=404, detail="Repository not found")
+    removed = compact_repo_memory(repo_path)
+    return {"repo": repo_id, "entries_removed": removed}
+
+
+@app.post("/rag/query")
+def search_rag(query: dict[str, str | int | None]) -> dict[str, list[str]]:
+    """Query cloud RAG backend."""
+    results = query_cloud_rag(
+        query.get("query", ""),
+        repo_name=query.get("repo_name"),
+        top_k=query.get("top_k", 4),
+        filter_tags=query.get("filter_tags"),
+    )
+    return {"results": results, "count": len(results)}
+
+
+@app.get("/rag/endpoint")
+def get_rag_config() -> dict[str, str | None]:
+    """Get configured RAG endpoint."""
+    return {"endpoint": get_rag_endpoint()}
