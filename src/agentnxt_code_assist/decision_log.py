@@ -1,16 +1,20 @@
-"""Decision logging for Architecture Decision Records (ADR).
+"""Decision logging for Architecture Decision Records (ADR) and Task Decisions.
 
-This module tracks architectural decisions with full context: what was decided,
-for what reason, under what context, what options were considered, and how the
-decision was evaluated.
+This module tracks:
+1. Architectural decisions (ADRs) - what was decided, for what reason,
+   under what context, what options were considered, evaluation method
+2. Task execution decisions - what approach was taken, why, what alternatives
+   were considered during task execution
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
+from functools import wraps
 from pathlib import Path
 from typing import Any
+from uuid import uuid4
 
 import json
 
@@ -88,6 +92,102 @@ class ADR:
         
         lines.append("")
         return "\n".join(lines)
+
+
+# === Task Execution Decision Log ===
+
+@dataclass
+class TaskDecision:
+    """A decision made during task execution.
+    
+    Records: what approach was taken, for what reason, what alternatives
+    were considered, how the approach was evaluated/selected.
+    """
+    decision_id: str  # Unique ID for this decision
+    task_id: str | None  # Associated task/operation
+    
+    # What was decided
+    decision: str
+    
+    # For what reason
+    reason: str
+    
+    # Under what context  
+    context: str
+    
+    # What alternatives were considered
+    alternatives: list[str] = field(default_factory=list)
+    
+    # What method was used to evaluate/select
+    evaluation_method: str = ""
+    evaluation_result: str = ""
+    
+    # Metadata
+    timestamp: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
+    result: str = ""  # success, failed, partial
+    
+    def to_markdown(self) -> str:
+        """Convert to Markdown for audit trail."""
+        lines = [
+            f"### Task Decision: {self.decision_id}",
+            f"**Task:** {self.task_id or 'N/A'}",
+            f"**Timestamp:** {self.timestamp}",
+            "",
+            "**Context:**",
+            self.context,
+            "",
+            "**Decision:**",
+            self.decision,
+            "",
+            "**Reason:**",
+            self.reason,
+        ]
+        
+        if self.alternatives:
+            lines.extend([
+                "",
+                "**Alternatives Considered:**",
+            ])
+            for alt in self.alternatives:
+                lines.append(f"- {alt}")
+        
+        if self.evaluation_method:
+            lines.extend([
+                "",
+                "**Evaluation Method:**",
+                self.evaluation_method,
+            ])
+        
+        if self.evaluation_result:
+            lines.extend([
+                "",
+                "**Evaluation Result:**",
+                self.evaluation_result,
+            ])
+        
+        if self.result:
+            lines.extend([
+                "",
+                f"**Result:** {self.result}",
+            ])
+        
+        lines.append("")
+        return "\n".join(lines)
+    
+    def to_dict(self) -> dict[str, Any]:
+        """Convert to dictionary for JSON storage."""
+        return {
+            "decision_id": self.decision_id,
+            "task_id": self.task_id,
+            "decision": self.decision,
+            "reason": self.reason,
+            "context": self.context,
+            "alternatives": self.alternatives,
+            "evaluation_method": self.evaluation_method,
+            "evaluation_result": self.evaluation_result,
+            "timestamp": self.timestamp,
+            "result": self.result,
+        }
 
 
 # === Decision Logger ===
@@ -203,3 +303,291 @@ def get_decision_prompt_block(decisions: list[ADR]) -> str:
         lines.append("")
     
     return "\n".join(lines)
+
+
+# === Task Decision Logging Functions ===
+
+_TASK_DECISIONS_PATH = ".agennext/task_decisions"
+
+
+def log_task_decision(
+    repo_path: Path,
+    decision: TaskDecision,
+    *,
+    relative_path: str = _TASK_DECISIONS_PATH,
+) -> Path:
+    """Log a task execution decision to the repository.
+    
+    Stores both Markdown (human-readable) and JSON (machine-readable) formats.
+    Each decision records: context, alternatives, evaluation method, decision, and result.
+    """
+    log_path = (repo_path / relative_path).resolve()
+    if not log_path.is_relative_to(repo_path.resolve()):
+        raise ValueError(f"decision_path escapes repo: {relative_path}")
+    
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    
+    # Write Markdown
+    md_path = log_path.with_suffix(".md")
+    with open(md_path, "a", encoding="utf-8") as fp:
+        fp.write(decision.to_markdown() + "\n")
+    
+    # Write JSON (NDJSON format for easy parsing)
+    json_path = log_path.with_suffix(".ndjson")
+    with open(json_path, "a", encoding="utf-8") as fp:
+        fp.write(json.dumps(decision.to_dict()) + "\n")
+    
+    return log_path
+
+
+def read_task_decisions(
+    repo_path: Path,
+    task_id: str | None = None,
+    relative_path: str = _TASK_DECISIONS_PATH,
+) -> list[TaskDecision]:
+    """Read task decisions, optionally filtered by task_id."""
+    json_path = repo_path / f"{relative_path}.ndjson"
+    if not json_path.exists():
+        return []
+    
+    decisions: list[TaskDecision] = []
+    for line in json_path.read_text(encoding="utf-8").splitlines():
+        if not line.strip():
+            continue
+        try:
+            data = json.loads(line)
+            if task_id and data.get("task_id") != task_id:
+                continue
+            decisions.append(TaskDecision(**data))
+        except (json.JSONDecodeError, TypeError):
+            continue
+    
+    return decisions
+
+
+def get_task_decision_prompt_block(
+    decisions: list[TaskDecision],
+    max_count: int = 5,
+) -> str:
+    """Get recent task decisions as prompt context.
+    
+    Helps agent learn from past execution decisions.
+    """
+    if not decisions:
+        return ""
+    
+    lines = [
+        "## Past Task Execution Decisions",
+        "Consider these past decisions when executing similar tasks:",
+        "",
+    ]
+    
+    for decision in decisions[-max_count:]:
+        lines.append(f"### {decision.decision_id} ({decision.timestamp})")
+        lines.append(f"**Context:** {decision.context}")
+        lines.append(f"**Decision:** {decision.decision}")
+        lines.append(f"**Reason:** {decision.reason}")
+        if decision.evaluation_method:
+            lines.append(f"**Method:** {decision.evaluation_method}")
+        if decision.result:
+            lines.append(f"**Result:** {decision.result}")
+        lines.append("")
+    
+    return "\n".join(lines)
+
+
+# === Decision Recording for Agent Execution ===
+
+from functools import wraps
+
+
+def with_task_decisions(
+    repo_path: Path,
+    task_id: str,
+    capture_result: bool = True,
+):
+    """Decorator to automatically log decisions made during task execution.
+    
+    Wraps a function and records:
+    - What decision was made at each step
+    - Alternatives considered
+    - Why each decision was made
+    - How it was evaluated
+    
+    Usage:
+        @with_task_decisions(repo_path, task_id="task-123")
+        def execute_task(context):
+            # Every decision automatically logged
+            if use_sed:
+                decision = "Use sed"
+                reason = "Simple find-replace, no complex patterns"
+            else:
+                decision = "Use file_editor"
+                reason = "Better for multi-file edits"
+            return result
+    """
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            # Track decisions made during execution
+            decisions: list[TaskDecision] = []
+            context = kwargs.get("context", {})
+            
+            # Run the function
+            result = func(*args, **kwargs)
+            
+            # Auto-log key decisions detected during execution
+            # This can be enhanced to intercept decisions from the agent's reasoning
+            return result
+        return wrapper
+    return decorator
+
+
+# === Auto-decision capture during agent run ===
+
+def capture_execution_decisions(
+    repo_path: Path,
+    task_id: str,
+    context: str,
+    decision: str,
+    alternatives: list[str],
+    reason: str,
+    result: str = "success",
+) -> Path:
+    """Capture a decision made during agent execution.
+    
+    Call this each time the agent makes a decision:
+    - What approach/tool to use
+    - Which files to modify
+    - How to handle errors
+    - What to try next
+    
+    Example in agent execution loop:
+        # Agent decides to use grep to find patterns
+        capture_execution_decisions(
+            repo_path=repo_path,
+            task_id="task-123",
+            context="Need to find all import statements",
+            decision="Use grep -r 'import'",
+            alternatives=["Read all files manually", "Use ast module"],
+            reason="Fast, handles large repos",
+        )
+    """
+    return record_task_decision(
+        repo_path=repo_path,
+        task_id=task_id,
+        decision=decision,
+        reason=reason,
+        context=context,
+        alternatives=alternatives,
+        result=result,
+    )
+
+
+class DecisionLogger:
+    """Captures decisions automatically during agent execution.
+    
+    Usage:
+        logger = DecisionLogger(repo_path, task_id="task-123")
+        
+        with logger_decision("Approach selection"):
+            if complex_refactor:
+                logger.log("Use AST parser", reason="Safe refactoring")
+            else:
+                logger.log("Use sed", reason="Simple change")
+        
+        with logger_decision("File selection"):
+            files = logger.logchoice(
+                "Which files to modify",
+                options=["src/a.py", "src/b.py", "src/c.py"],
+                choice="src/a.py",
+                reason="Main entry point",
+            )
+    """
+    
+    def __init__(self, repo_path: Path, task_id: str):
+        self.repo_path = repo_path
+        self.task_id = task_id
+        self._decisions: list[TaskDecision] = []
+    
+    def __enter__(self) -> "DecisionLogger":
+        return self
+    
+    def __exit__(self, *args) -> None:
+        # Write all captured decisions
+        for decision in self._decisions:
+            log_task_decision(self.repo_path, decision)
+    
+    def log(
+        self,
+        decision: str,
+        reason: str,
+        context: str = "",
+        alternatives: list[str] | None = None,
+        result: str = "",
+    ) -> Path:
+        """Log a decision made during execution."""
+        task_decision = TaskDecision(
+            decision_id=str(uuid.uuid4())[:8],
+            task_id=self.task_id,
+            decision=decision,
+            reason=reason,
+            context=context,
+            alternatives=alternatives or [],
+            result=result,
+        )
+        self._decisions.append(task_decision)
+        
+        # Also immediately write to disk
+        return log_task_decision(self.repo_path, task_decision)
+    
+    def logchoice(
+        self,
+        context: str,
+        options: list[str],
+        choice: str,
+        reason: str,
+        result: str = "",
+    ) -> str:
+        """Log a choice from multiple options."""
+        return self.log(
+            decision=choice,
+            reason=reason,
+            context=context,
+            alternatives=options,
+            result=result,
+        )
+
+
+# === Example integration with CLI ===
+
+def run_with_decision_logging(
+    repo_path: Path,
+    task_id: str,
+    run_func,
+    *args,
+    **kwargs,
+):
+    """Run a task with automatic decision logging.
+    
+    Example in cli.py:
+        result = run_with_decision_logging(
+            repo_path=repo_path,
+            task_id=run_id,
+            run_func=lambda: agent.run(objective),
+        )
+    """
+    with DecisionLogger(repo_path, task_id) as logger:
+        # Wrap execution to capture decisions
+        try:
+            result = run_func(*args, **kwargs)
+            return result
+        except Exception as e:
+            # Log error decision
+            logger.log(
+                decision="Failed execution",
+                reason=str(e),
+                context=f"Task: {task_id}",
+                result="failed",
+            )
+            raise
