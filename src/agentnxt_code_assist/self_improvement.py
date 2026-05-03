@@ -405,7 +405,150 @@ class SelfImprovementEngine:
             self.constraint_effectiveness[k] = defaultdict(int, v)
 
 
-# === Auto-Improvement ===
+# === Auto-Skill Improvement ===
+
+def auto_improve_skills(
+    skill_registry,
+    metrics_path: Path | None = None,
+) -> list[str]:
+    """Auto-improve skills based on performance metrics.
+    
+    Returns: list of skill names that were improved/replaced
+    """
+    from agentnxt_code_assist.skill_registry import SkillPriority
+    
+    engine = SelfImprovementEngine(metrics_path)
+    improvements = []
+    
+    # Find underperforming skills
+    for name, perf in engine.skill_performance.items():
+        if perf.times_used >= 5 and perf.success_rate < 0.4:
+            skill = skill_registry.get(name)
+            if skill:
+                # Lower priority for underperformers
+                old_priority = skill.priority
+                skill.priority = SkillPriority.OPTIONAL
+                improvements.append(
+                    f"Demoted {name} from {old_priority.name} to OPTIONAL "
+                    f"(only {perf.success_rate:.0%} success)"
+                )
+        
+        elif perf.times_used >= 5 and perf.success_rate > 0.85:
+            skill = skill_registry.get(name)
+            if skill and skill.priority == SkillPriority.RECOMMENDED:
+                # Boost highly successful skills
+                old_priority = skill.priority
+                skill.priority = SkillPriority.REQUIRED
+                improvements.append(
+                    f"Promoted {name} to REQUIRED "
+                    f"({perf.success_rate:.0%} success)"
+                )
+    
+    return improvements
+
+
+# === Auto-Tool Improvement ===
+
+def auto_improve_tools(
+    tool_registry,
+    metrics_path: Path | None = None,
+) -> list[str]:
+    """Auto-improve tools based on performance metrics.
+    
+    Returns: list of tool names that were modified
+    """
+    engine = SelfImprovementEngine(metrics_path)
+    improvements = []
+    
+    # Mark slow tools as lower priority
+    for name, perf in engine.tool_performance.items():
+        if perf.times_used >= 3 and perf.avg_duration > 120:
+            # Add timeout hint
+            tool = tool_registry.get_tool(name)
+            if tool and tool.estimated_time_ms > 1000:
+                # Reduce estimated time for retry planning
+                tool.estimated_time_ms = int(perf.avg_duration * 1000)
+                improvements.append(f"Updated {name} timeout to {perf.avg_duration:.0f}s")
+    
+    # Mark failed tools
+    for name, perf in engine.tool_performance.items():
+        if perf.times_used >= 3 and perf.success_rate < 0.3:
+            tool = tool_registry.get_tool(name)
+            if tool:
+                tool.success_rate = perf.success_rate
+                improvements.append(
+                    f"Updated {name} success_rate to {perf.success_rate:.0%}"
+                )
+    
+    return improvements
+
+
+# === Adaptive Constraint Tuning ===
+
+def suggest_better_constraints(
+    metrics_path: Path | None = None,
+) -> dict[str, Any]:
+    """Suggest better constraint values based on past data."""
+    engine = SelfImprovementEngine(metrics_path)
+    
+    suggestions = {}
+    
+    # Analyze cost effectiveness
+    for skill_name, perf in engine.skill_performance.items():
+        if perf.times_used >= 3:
+            avg_cost = perf.avg_cost
+            suggestions[skill_name] = {
+                "optimal_budget": avg_cost * 1.5,  # 50% buffer
+                "recommended_tokens": perf.total_tokens // max(1, perf.times_used) * 2,
+                "timeout_seconds": perf.avg_duration * 1.5,
+            }
+    
+    return suggestions
+
+
+# === Full Auto-Improve ===
+
+def auto_improve_all(
+    skills_registry=None,
+    tools_registry=None,
+    metrics_path: Path | None = None,
+) -> str:
+    """Run full self-improvement: skills + tools + constraints.
+    
+    Returns: improvement report
+    """
+    lines = ["## Auto-Improvement Report"]
+    lines.append("Running self-improvement checks...")
+    
+    # Improve skills
+    if skills_registry:
+        skill_improvements = auto_improve_skills(skills_registry, metrics_path)
+        if skill_improvements:
+            lines.append("\n### Skill Improvements")
+            lines.extend(skill_improvements)
+        else:
+            lines.append("\n### Skills: No improvements needed")
+    
+    # Improve tools
+    if tools_registry:
+        tool_improvements = auto_improve_tools(tools_registry, metrics_path)
+        if tool_improvements:
+            lines.append("\n### Tool Improvements")
+            lines.extend(tool_improvements)
+        else:
+            lines.append("\n### Tools: No improvements needed")
+    
+    # Suggest constraint tuning
+    constraints = suggest_better_constraints(metrics_path)
+    if constraints:
+        lines.append("\n### Suggested Constraints")
+        for skill, cfg in constraints.items():
+            lines.append(
+                f"- {skill}: budget=${cfg['optimal_budget']:.4f}, "
+                f"timeout={cfg['timeout_seconds']:.0f}s"
+            )
+    
+    return "\n".join(lines)
 
 def record_execution_and_learn(
     result: ExecutionResult,
