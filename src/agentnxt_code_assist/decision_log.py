@@ -18,6 +18,9 @@ from uuid import uuid4
 
 import json
 
+# Local imports (after defining data classes for forward refs)
+from agentnxt_code_assist.context_aware import AgentContext, SessionContext
+
 
 @dataclass
 class DecisionOption:
@@ -487,36 +490,73 @@ def capture_execution_decisions(
 class DecisionLogger:
     """Captures decisions automatically during agent execution.
     
+    - Automatically checks constraints (timeline, budget, path limits)
+    - Enforces guardrails before allowing decisions
+    - Integrates with context_aware for constraint checking
+    
     Usage:
-        logger = DecisionLogger(repo_path, task_id="task-123")
+        logger = DecisionLogger(repo_path, task_id="task-123", context=ctx)
         
-        with logger_decision("Approach selection"):
-            if complex_refactor:
-                logger.log("Use AST parser", reason="Safe refactoring")
-            else:
-                logger.log("Use sed", reason="Simple change")
+        # Decision automatically validates against constraints
+        logger.log("Use AST parser", reason="Safe refactoring"))
         
-        with logger_decision("File selection"):
-            files = logger.logchoice(
-                "Which files to modify",
-                options=["src/a.py", "src/b.py", "src/c.py"],
-                choice="src/a.py",
-                reason="Main entry point",
-            )
+        # Choice from options - validates all options
+        files = logger.logchoice(
+            "Which files",
+            options=["src/a.py", "src/b.py"],
+            choice="src/a.py",
+            reason="Main entry",
+        )
     """
     
-    def __init__(self, repo_path: Path, task_id: str):
+    def __init__(
+        self,
+        repo_path: Path,
+        task_id: str,
+        context=None,  # AgentContext
+    ):
         self.repo_path = repo_path
         self.task_id = task_id
+        self.ctx = context
         self._decisions: list[TaskDecision] = []
+        self._blocked: list[str] = []
     
     def __enter__(self) -> "DecisionLogger":
         return self
     
     def __exit__(self, *args) -> None:
-        # Write all captured decisions
         for decision in self._decisions:
             log_task_decision(self.repo_path, decision)
+    
+    def _check_constraints(self, decision: str, alternatives: list[str] | None) -> tuple[bool, str]:
+        """Validate decision against constraints."""
+        if not self.ctx:
+            return True, "OK"
+        
+        from agentnxt_code_assist.context_aware import check_constraints
+        import re
+        
+        # Extract file paths
+        paths = re.findall(r'[a-zA-Z0-9_/.-]+\.(?:py|ts|js|md|json|yml)', decision)
+        
+        allowed, reason = check_constraints(self.ctx, files_to_change=paths or None)
+        if not allowed:
+            return False, reason
+        
+        # Filter alternatives
+        if alternatives:
+            valid_alts = []
+            for alt in alternatives:
+                alt_paths = re.findall(r'[a-zA-Z0-9_/.-]+\.(?:py|ts|js|md|json|yml)', alt)
+                if alt_paths:
+                    ok, _ = check_constraints(self.ctx, files_to_change=alt_paths)
+                    if ok:
+                        valid_alts.append(alt)
+                else:
+                    valid_alts.append(alt)
+            alternatives[:] = valid_alts
+        
+        return True, "OK"
     
     def log(
         self,
@@ -525,20 +565,37 @@ class DecisionLogger:
         context: str = "",
         alternatives: list[str] | None = None,
         result: str = "",
-    ) -> Path:
-        """Log a decision made during execution."""
+    ) -> Path | None:
+        """Log decision - returns None if blocked by constraints."""
+        allowed, block_reason = self._check_constraints(decision, alternatives)
+        
+        if not allowed:
+            self._blocked.append(f"{decision}: {block_reason}")
+            blocked = TaskDecision(
+                decision_id=str(uuid4())[:8],
+                task_id=self.task_id,
+                decision=f"[BLOCKED] {decision}",
+                reason=reason,
+                context=context,
+                alternatives=alternatives or [],
+                evaluation_method="constraint_check",
+                evaluation_result=block_reason,
+                result="blocked",
+            )
+            self._decisions.append(blocked)
+            log_task_decision(self.repo_path, blocked)
+            return None
+        
         task_decision = TaskDecision(
-            decision_id=str(uuid.uuid4())[:8],
+            decision_id=str(uuid4())[:8],
             task_id=self.task_id,
             decision=decision,
             reason=reason,
             context=context,
             alternatives=alternatives or [],
-            result=result,
+            result=result or "success",
         )
         self._decisions.append(task_decision)
-        
-        # Also immediately write to disk
         return log_task_decision(self.repo_path, task_decision)
     
     def logchoice(
@@ -548,15 +605,84 @@ class DecisionLogger:
         choice: str,
         reason: str,
         result: str = "",
-    ) -> str:
-        """Log a choice from multiple options."""
-        return self.log(
-            decision=choice,
-            reason=reason,
-            context=context,
-            alternatives=options,
-            result=result,
+    ) -> str | None:
+        """Log choice from options - validates all first."""
+        return self.log(decision=choice, reason=reason, context=context, alternatives=options, result=result)
+    
+    def get_blocked(self) -> list[str]:
+        return self._blocked.copy()
+    
+    def get_prompt_context(self) -> str:
+        """Generate guardrail context for prompt."""
+        if not self.ctx:
+            return ""
+        
+        lines = ["## Decision Guardrails"]
+        session = self.ctx.session
+        
+        if session.deadline:
+            lines.append(f"- Deadline: {session.deadline}")
+        
+        if session.max_cost_usd > 0:
+            lines.append(f"- Budget: ${session.max_cost_usd:.2f}")
+            lines.append(f"- Tokens: {session.tokens_used:,}")
+        
+        if session.max_files > 0:
+            remaining = session.max_files - session.files_modified
+            lines.append(f"- Files remaining: {remaining}")
+        
+        if session.allowed_paths:
+            lines.append(f"- Allowed: {', '.join(session.allowed_paths)}")
+        if session.blocked_paths:
+            lines.append(f"- Blocked: {', '.join(session.blocked_paths)}")
+        
+        if self._blocked:
+            lines.append("\n## Blocked Decisions")
+            for b in self._blocked[-3:]:
+                lines.append(f"- {b}")
+        
+        return "\n".join(lines)
+
+
+# === Run with Constraint-Aware Decisions ===
+
+def run_with_constraints(
+    repo_path: Path,
+    task_id: str,
+    objective: str,
+    deadline: str | None = None,
+    *,
+    max_tokens: int = 0,
+    max_cost_usd: float = 0.0,
+    max_files: int = 0,
+    allowed_paths: list[str] | None = None,
+    blocked_paths: list[str] | None = None,
+):
+    """Decorator for constraint-aware execution."""
+    from functools import wraps
+    
+    ctx = AgentContext(
+        session=SessionContext(
+            task_id=task_id,
+            objective=objective,
+            deadline=deadline,
+            max_tokens=max_tokens,
+            max_cost_usd=max_cost_usd,
+            max_files=max_files,
+            allowed_paths=allowed_paths or [],
+            blocked_paths=blocked_paths or [],
         )
+    )
+    
+    def decorator(run_func):
+        @wraps(run_func)
+        def wrapper(*args, **kwargs):
+            with DecisionLogger(repo_path, task_id, ctx) as logger:
+                result = run_func(*args, **kwargs)
+                return result, logger.get_prompt_context()
+        return wrapper
+    
+    return decorator
 
 
 # === Example integration with CLI ===
