@@ -20,6 +20,8 @@
       <nav aria-label="Primary navigation">
         <a href="#features">Features</a>
         <a href="#quickstart">Quickstart</a>
+        <a href="#desktop">Desktop App</a>
+        <a href="#testing">Testing</a>
         <a href="#architecture">Architecture</a>
         <a href="#roadmap">Roadmap</a>
         <a class="nav-cta" href="https://github.com/AGenNext/Code-Assist">GitHub</a>
@@ -100,6 +102,40 @@ python3.12 -m venv .venv
 cp .env.example .env</code></pre>
           <pre><code>agennext-code-assist serve --host 127.0.0.1 --port 8090</code></pre>
           <pre><code>bash scripts/simulate-production.sh up</code></pre>
+        </div>
+      </section>
+
+      <section id="desktop" class="section split">
+        <div>
+          <p class="eyebrow">Desktop App</p>
+          <h2>Native macOS application</h2>
+          <p>
+            Package the Next.js web UI as a native macOS desktop application for local operator use.
+          </p>
+        </div>
+        <div class="code-stack">
+          <pre><code>cd web
+npm install
+npm run electron:dev</code></pre>
+          <pre><code>npm run electron:build:dmg</code></pre>
+          <p class="caption">Creates CodeAssist.dmg in the release folder.</p>
+        </div>
+      </section>
+
+      <section id="testing" class="section split">
+        <div>
+          <p class="eyebrow">Testing</p>
+          <h2>End-to-end testing</h2>
+          <p>
+            Playwright E2E tests verify the web UI loads and functions correctly across browsers.
+          </p>
+        </div>
+        <div class="code-stack">
+          <pre><code>cd web
+npm install
+npx playwright install chromium</code></pre>
+          <pre><code>npx playwright test</code></pre>
+          <p class="caption">Runs all E2E tests with HTML reporting.</p>
         </div>
       </section>
 
