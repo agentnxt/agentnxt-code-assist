@@ -2,12 +2,18 @@
   "name": "@agennext/code-assist-web",
   "version": "0.1.0",
   "private": true,
+  "description": "CodeAssist - AI Coding Assistant",
+  "author": "CodeAssist Team",
+  "main": "electron/main.js",
   "scripts": {
     "dev": "next dev -p 3000",
     "build": "next build",
     "start": "next start -p 3000",
     "lint": "next lint",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "electron:dev": "NODE_ENV=development electron .",
+    "electron:build": "next build && electron-builder --mac",
+    "electron:build:dmg": "next build && electron-builder --mac dmg"
   },
   "dependencies": {
     "@types/node": "^20.11.30",
@@ -18,5 +24,49 @@
     "react-dom": "^18.2.0",
     "typescript": "^5.4.5"
   },
-  "devDependencies": {}
+  "devDependencies": {
+    "@playwright/test": "^1.59.1",
+    "electron": "^41.5.0",
+    "electron-builder": "^26.8.1",
+    "playwright": "^1.59.1"
+  },
+  "build": {
+    "appId": "com.codeassist.web",
+    "productName": "CodeAssist",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      ".next/**/*",
+      "electron/**/*",
+      "package.json"
+    ],
+    "mac": {
+      "category": "public.app-category.developer-tools",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
+      ]
+    },
+    "dmg": {
+      "title": "CodeAssist",
+      "contents": [
+        {
+          "x": 130,
+          "y": 220
+        },
+        {
+          "x": 410,
+          "y": 220,
+          "type": "link",
+          "path": "/Applications"
+        }
+      ]
+    }
+  }
 }

@@ -607,3 +607,72 @@ print(result.change_log)
 - If `files` is empty, Aider can still use the repo map, but targeted files usually produce better edits.
 - Aider requires Python 3.10-3.12 at the time this wrapper was created.
 - Keep the HTTP API bound to `127.0.0.1` or a private network unless authentication is added.
+
+---
+
+## Optional macOS Desktop App (DMG)
+
+The Next.js web UI can be packaged as a native macOS desktop application using Electron and electron-builder.
+
+### Prerequisites
+
+```bash
+cd web
+npm install
+```
+
+### Development Mode
+
+Run the Electron app in development mode:
+
+```bash
+npm run electron:dev
+```
+
+### Build DMG
+
+Package the web UI as a macOS disk image:
+
+```bash
+npm run electron:build:dmg
+```
+
+The DMG will be created in `web/release/CodeAssist-0.1.0.dmg`.
+
+Note: DMG creation requires macOS because `dmg-builder` has native dependencies. On Linux, you can build the `.app` bundle:
+
+```bash
+npm run electron:build
+```
+
+This creates `web/release/mac/CodeAssist.app`.
+
+---
+
+## End-to-End Testing
+
+The web UI includes Playwright end-to-end tests for quality assurance.
+
+### Prerequisites
+
+```bash
+cd web
+npm install
+npx playwright install chromium
+```
+
+### Run Tests
+
+Execute the E2E test suite:
+
+```bash
+cd web
+npx playwright test
+```
+
+### Test Configuration
+
+The test configuration is in `web/playwright.config.ts` and includes:
+- Chromium, Firefox, and WebKit browser testing
+- HTML test reporting
+- Automatic server startup during tests
