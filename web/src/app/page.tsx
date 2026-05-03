@@ -220,14 +220,32 @@ export default function HomePage() {
               value={model}
               onChange={(event) => setModel(event.target.value)}
             >
-              <option value="">Select provider first</option>
-              <option value="gpt-4o">GPT-4o</option>
-              <option value="gpt-4-turbo">GPT-4 Turbo</option>
-              <option value="gpt-4">GPT-4</option>
-              <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
-              <option value="claude-3-5-sonnet-20241022">Claude 3.5 Sonnet</option>
-              <option value="claude-3-opus-20240229">Claude 3 Opus</option>
-              <option value="claude-3-haiku-20240307">Claude 3 Haiku</option>
+              {provider === 'local' ? (
+                <>
+                  <option value="">Select model</option>
+                  <option value="llama3-8b">Llama 3 8B (4.9GB)</option>
+                  <option value="mistral-7b">Mistral 7B (4.1GB)</option>
+                  <option value="phi3-mini">Phi-3 Mini (2.3GB)</option>
+                </>
+              ) : provider === 'google' ? (
+                <>
+                  <option value="">Select model</option>
+                  <option value="gemini-1.5-pro">Gemini 1.5 Pro</option>
+                  <option value="gemini-1.5-flash">Gemini 1.5 Flash</option>
+                  <option value="gemini-1.0-pro">Gemini 1.0 Pro</option>
+                </>
+              ) : (
+                <>
+                  <option value="">Select provider first</option>
+                  <option value="gpt-4o">GPT-4o</option>
+                  <option value="gpt-4-turbo">GPT-4 Turbo</option>
+                  <option value="gpt-4">GPT-4</option>
+                  <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
+                  <option value="claude-3-5-sonnet-20241022">Claude 3.5 Sonnet</option>
+                  <option value="claude-3-opus-20240229">Claude 3 Opus</option>
+                  <option value="claude-3-haiku-20240307">Claude 3 Haiku</option>
+                </>
+              )}
             </select>
           </label>
 
@@ -288,7 +306,7 @@ export default function HomePage() {
               </label>
             )}
 
-            {provider !== 'gateway' && (
+            {(provider !== 'gateway' && provider !== 'local') && (
               <button
                 className="chip"
                 onClick={async () => {
