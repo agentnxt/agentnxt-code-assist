@@ -205,6 +205,11 @@ input:disabled {
   margin-top: 24px;
 }
 
+.settings-panel {
+  margin-top: 24px;
+  padding: 24px;
+}
+
 .result-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

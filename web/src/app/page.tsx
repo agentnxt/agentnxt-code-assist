@@ -1,8 +1,8 @@
 'use client';
 
-import { FormEvent, useMemo, useState } from 'react';
-import { runAssist } from '../lib/api';
-import type { AssistResult } from '../lib/types';
+import { FormEvent, useMemo, useState, useEffect } from 'react';
+import { runAssist, listProviders, getProvider, loginWithProvider } from '../lib/api';
+import type { AssistResult, AuthResponse } from '../lib/types';
 
 const CHECK_PRESETS = [
   'production',
@@ -47,6 +47,9 @@ export default function HomePage() {
   const [checks, setChecks] = useState<string[]>(['production']);
   const [envVars, setEnvVars] = useState('');
   const [model, setModel] = useState('gpt-4o');
+  const [provider, setProvider] = useState('openai');
+  const [providerModels, setProviderModels] = useState<string[]>([]);
+  const [providerApiBase, setProviderApiBase] = useState('');
   const [dryRun, setDryRun] = useState(false);
   const [notifySlack, setNotifySlack] = useState(false);
   const [checkUpstream, setCheckUpstream] = useState(false);
@@ -58,6 +61,22 @@ export default function HomePage() {
   const [result, setResult] = useState<AssistResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [authMessage, setAuthMessage] = useState<string | null>(null);
+
+  // Load available providers on mount
+  useEffect(() => {
+    loadProviders();
+  }, []);
+
+  async function loadProviders() {
+    try {
+      const res = await listProviders();
+      // Could store provider list here if needed
+      setProviderModels(['gpt-4o', 'gpt-4-turbo', 'gpt-3.5-turbo']);
+    } catch (e) {
+      console.error('Failed to load providers:', e);
+    }
+  }
 
   const selectedChecks = useMemo(() => checks.join(', '), [checks]);
 
@@ -187,8 +206,76 @@ export default function HomePage() {
 
           <label>
             Model
-            <input value={model} onChange={(event) => setModel(event.target.value)} />
+            <select
+              value={model}
+              onChange={(event) => setModel(event.target.value)}
+            >
+              <option value="">Select provider first</option>
+              <option value="gpt-4o">GPT-4o</option>
+              <option value="gpt-4-turbo">GPT-4 Turbo</option>
+              <option value="gpt-4">GPT-4</option>
+              <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
+              <option value="claude-3-5-sonnet-20241022">Claude 3.5 Sonnet</option>
+              <option value="claude-3-opus-20240229">Claude 3 Opus</option>
+              <option value="claude-3-haiku-20240307">Claude 3 Haiku</option>
+            </select>
           </label>
+
+          <section className="panel settings-panel">
+            <h2>Provider Settings</h2>
+            <p className="muted">Sign in with your provider account to automatically get an API key</p>
+            
+            <label>
+              Provider
+              <select
+                value={provider}
+                onChange={(event) => {
+                  setProvider(event.target.value);
+                  setModel('gpt-4o');
+                }}
+              >
+                <option value="openai">OpenAI</option>
+                <option value="anthropic">Anthropic (Claude)</option>
+                <option value="google">Google (Gemini)</option>
+                <option value="gateway">Custom Gateway</option>
+              </select>
+            </label>
+
+            {provider === 'gateway' && (
+              <label>
+                API Base URL
+                <input
+                  value={providerApiBase}
+                  onChange={(event) => setProviderApiBase(event.target.value)}
+                  placeholder="https://llm.example.com/v1"
+                />
+              </label>
+            )}
+
+            {provider !== 'gateway' && (
+              <button
+                className="chip"
+                onClick={async () => {
+                  try {
+                    setLoading(true);
+                    const res = await loginWithProvider(provider);
+                    // Open provider login in new tab/window
+                    window.open(res.redirect, '_blank', 'width=600,height=700');
+                    setAuthMessage('Please sign in with ' + provider + ' in the new window, then return here');
+                  } catch (e) {
+                    setError(e instanceof Error ? e.message : 'Failed to initiate login');
+                  } finally {
+                    setLoading(false);
+                  }
+                }}
+                disabled={loading}
+              >
+                {loading ? 'Loading...' : 'Sign in with ' + provider}
+              </button>
+            )}
+
+            {authMessage && <p className="muted">{authMessage}</p>}
+          </section>
 
           <label>
             Environment variables
