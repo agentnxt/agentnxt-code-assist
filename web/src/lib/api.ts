@@ -45,6 +45,22 @@ export async function loginWithProvider(provider: string): Promise<{redirect: st
   return response.json();
 }
 
+// === Local Model/Fallback API ===
+
+export async function listLocalModels(): Promise<{installed: string[], available: Record<string, string>}> {
+  const response = await fetch(`${API_BASE}/local/models`);
+  return response.json();
+}
+
+export async function runLocalModel(prompt: string, model = "llama3-8b"): Promise<string> {
+  const response = await fetch(`${API_BASE}/local/run`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ prompt, model }),
+  });
+  return response.text();
+}
+
 export async function setupProvider(
   provider: string,
   setup: ProviderSetup

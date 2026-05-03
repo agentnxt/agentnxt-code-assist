@@ -9,6 +9,7 @@ import uvicorn
 
 from agentnxt_code_assist.aider_runner import AiderCodeAssist
 from agentnxt_code_assist.config import Settings
+from agentnxt_code_assist.local_llm import download_model, get_fallback_instructions, get_installed_models, MODELS
 from agentnxt_code_assist.ports import find_available_port
 from agentnxt_code_assist.schemas import AssistRequest
 
@@ -67,6 +68,20 @@ def build_parser() -> argparse.ArgumentParser:
     serve_parser.add_argument("--port", type=int, help="Preferred bind port")
     serve_parser.add_argument("--fixed-port", action="store_true", help="Fail if the preferred port is unavailable")
     serve_parser.add_argument("--port-scan-limit", type=int, default=100, help="Number of sequential ports to scan")
+
+    # Local model subcommand
+    local_parser = subparsers.add_parser("local", help="Manage local llama.cpp models")
+    local_subparsers = local_parser.add_subparsers(dest="local_command", required=True)
+    
+    list_parser = local_subparsers.add_parser("list", help="List available local models")
+    download_parser = local_subparsers.add_parser("download", help="Download a model")
+    download_parser.add_argument("model", nargs="?", default="llama3-8b", help=f"Model to download: {', '.join(MODELS.keys())}")
+    run_parser = local_subparsers.add_parser("run", help="Run a prompt through local model")
+    run_parser.add_argument("prompt", help="Prompt to run")
+    run_parser.add_argument("--model", default="llama3-8b", help="Model to use")
+    run_parser.add_argument("--max-tokens", type=int, default=2048, help="Max tokens to generate")
+    run_parser.add_argument("--temperature", type=float, default=0.7, help="Temperature")
+    fallback_parser = local_subparsers.add_parser("help", help="Show fallback setup instructions")
 
     return parser
 
@@ -187,6 +202,37 @@ def main() -> int:
         return run_command(args, settings)
     if args.command == "serve":
         return serve_command(args, settings)
+    if args.command == "local":
+        if args.local_command == "list":
+            models = get_installed_models()
+            if models:
+                print("Installed local models:")
+                for m in models:
+                    print(f"  - {m}")
+            else:
+                print("No local models installed.")
+            print("\nAvailable for download:")
+            for m, info in MODELS.items():
+                print(f"  - {m} ({info['size']})")
+            return 0
+        if args.local_command == "download":
+            import asyncio
+            path = asyncio.run(download_model(args.model))
+            print(f"Downloaded to: {path}")
+            return 0
+        if args.local_command == "run":
+            import asyncio
+            result = asyncio.run(run_local_model(
+                args.prompt,
+                model=args.model,
+                max_tokens=args.max_tokens,
+                temperature=args.temperature,
+            ))
+            print(result.rstrip())
+            return 0
+        if args.local_command == "help":
+            print(get_fallback_instructions())
+            return 0
 
     parser.error(f"unknown command: {args.command}")
     return 2
