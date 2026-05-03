@@ -6,7 +6,7 @@
   --border: #2d3a5f;
   --text: #f7f8fb;
   --muted: #aab4cf;
-  --accent: #85e7ff;
+  --accent: #39ff14;
   --danger: #ff8a8a;
   --success: #9ef7bb;
   --warning: #ffd38a;
@@ -129,7 +129,7 @@ textarea {
 input:focus,
 textarea:focus {
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(133, 231, 255, 0.12);
+  box-shadow: 0 0 0 3px rgba(57, 255, 20, 0.12);
 }
 
 input:disabled {
@@ -154,14 +154,14 @@ input:disabled {
 
 .chip.selected {
   border-color: var(--accent);
-  background: rgba(133, 231, 255, 0.16);
+  background: rgba(57, 255, 20, 0.16);
 }
 
 .run {
   border-radius: 16px;
   padding: 14px 18px;
   font-weight: 800;
-  background: linear-gradient(135deg, #85e7ff, #a6ffcf);
+  background: linear-gradient(135deg, #39ff14, #7fff5a);
   color: #07111e;
 }
 
