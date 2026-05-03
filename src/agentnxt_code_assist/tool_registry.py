@@ -292,9 +292,13 @@ class ToolsRegistry:
         matching.sort(key=lambda x: x[0], reverse=True)
         return [s for _, s in matching]
     
-    def select_best_tool(self, task: str) -> tuple[Tool | None, str | None]:
+    def select_best_tool(self, task: str, context=None) -> tuple[Tool | None, str | None]:
         """Select best tool for task, with web fallback if needed.
         
+        Args:
+            task: The task to complete
+            context: Optional AgentContext for constraint checking
+            
         Returns: (tool, fallback_search_query or None)
         """
         tools = self.find_tools_for_task(task)
@@ -304,6 +308,37 @@ class ToolsRegistry:
             if self._web_fallback_enabled:
                 return None, f"how to {task}"
             return None, None
+        
+        # Filter by constraints if context provided
+        if context:
+            from agentnxt_code_assist.context_aware import check_constraints
+            valid_tools = []
+            for tool in tools:
+                # Check if tool's estimated time fits budget
+                if context.session.deadline:
+                    # Could add time checking here
+                    pass
+                
+                # Check budget (cost estimate)
+                cost_estimate = tool.estimated_time_ms / 1000 * 0.001  # Rough estimate
+                allowed, reason = check_constraints(
+                    context,
+                    estimated_tokens=tool.estimated_time_ms // 100,
+                )
+                
+                if allowed:
+                    valid_tools.append(tool)
+                else:
+                    # Tool doesn't fit constraints
+                    pass
+            
+            if valid_tools:
+                tools = valid_tools
+            else:
+                # All tools violate constraints
+                if self._web_fallback_enabled:
+                    return tools[0] if tools[0] else None, f"how to {task} within constraints"
+                return None, None
         
         best = tools[0]
         
@@ -317,6 +352,42 @@ class ToolsRegistry:
         
         return best, None
     
+    def check_tool_feasibility(
+        self,
+        tool: Tool,
+        context,
+    ) -> tuple[bool, str]:
+        """Check if tool can meet objective within constraints.
+        
+        Returns: (feasible, reason)
+        """
+        if not context:
+            return True, "OK"
+        
+        session = context.session
+        
+        # Check time constraint
+        if session.deadline:
+            estimated_seconds = tool.estimated_time_ms / 1000
+            # Rough check - might need better deadline validation
+            if estimated_seconds > 300:  # More than 5 min
+                return False, f"estimated time {estimated_seconds}s exceeds reasonable deadline"
+        
+        # Check cost constraint
+        if session.max_cost_usd > 0:
+            # Very rough estimate: $0.001 per 1000 tokens
+            cost_estimate = (tool.estimated_time_ms / 1000) * 0.001
+            if cost_estimate > session.max_cost_usd * 0.5:
+                return False, f"estimated cost ${cost_estimate:.3f} exceeds budget"
+        
+        # Check file constraint
+        if session.max_files > 0:
+            if tool.can_handle:  # Has file handling requirements
+                # This is a simplified check
+                pass
+        
+        return True, "OK"
+    
     def get_available_tools(self) -> list[str]:
         """Get list of available tool names."""
         available = []
@@ -326,6 +397,76 @@ class ToolsRegistry:
             elif tool.api_key_env and os.getenv(tool.api_key_env):
                 available.append(name)
         return available
+    
+    def generate_resource_efficient_plan(
+        self,
+        objective: str,
+        context=None,
+    ) -> tuple[list[dict], str]:
+        """Generate resource-efficient plan to meet objective within constraints.
+        
+        Returns: (plan_steps, explanation)
+        """
+        plan = []
+        explanation = []
+        
+        # Step 1: Find tools that can help
+        candidate_tools = self.find_tools_for_task(objective)
+        
+        # Step 2: Check feasibility with constraints
+        feasible_tools = []
+        for tool in candidate_tools:
+            feasible, reason = self.check_tool_feasibility(tool, context)
+            if feasible:
+                feasible_tools.append(tool)
+                explanation.append(f"✓ {tool.name}: can complete in {tool.estimated_time_ms}ms")
+            else:
+                explanation.append(f"✗ {tool.name}: {reason}")
+        
+        if not feasible_tools:
+            # No tool can meet constraints - use web search
+            if self._web_fallback_enabled:
+                fallback_query = f"how to {objective} with limited resources"
+                return [
+                    {"action": "web_search", "query": fallback_query},
+                    {"action": "analyze_results"},
+                    {"action": "execute_manually"},
+                ], "\n".join(explanation + [f"\nFallback: searching for {fallback_query}"])
+        
+        # Step 3: Create efficient plan
+        best_tool = feasible_tools[0]
+        
+        if best_tool.is_local:
+            plan.append({
+                "action": best_tool.name,
+                "reason": "Local tool available and within constraints",
+                "estimated_time": best_tool.estimated_time_ms,
+            })
+        else:
+            # Requires API
+            plan.append({
+                "action": best_tool.name,
+                "reason": f"Uses available {best_tool.api_key_env}",
+                "estimated_time": best_tool.estimated_time_ms,
+            })
+        
+        # Step 4: Add verification step
+        plan.append({
+            "action": "verify_result",
+            "reason": "Ensure objective is met",
+        })
+        
+        # Step 5: Add fallback if needed
+        if best_tool.success_rate < 1.0:
+            plan.append({
+                "action": "fallback",
+                "reason": f"Tool has {best_tool.success_rate*100}% success rate",
+                "alternative": "Try different approach",
+            })
+        
+        explanation.insert(0, f"## Plan for: {objective}\n")
+        
+        return plan, "\n".join(explanation)
     
     def get_prompt_context(self) -> str:
         """Generate prompt context about available tools."""
