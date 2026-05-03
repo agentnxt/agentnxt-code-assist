@@ -1,4 +1,4 @@
-"""Local LLM fallback using llama.cpp."""
+"""Local LLM fallback using llama.cpp - supports air-gapped/offline mode."""
 
 from __future__ import annotations
 
@@ -26,6 +26,22 @@ MODELS = {
         "size": "2.3GB",
     },
 }
+
+
+def is_air_gapped() -> bool:
+    """Check if we're in air-gapped (offline) mode.
+    
+    Looks for environment variable or tests network connectivity.
+    """
+    if os.getenv("AIR_GAPPED"):
+        return True
+    # Check if network is available
+    try:
+        import socket
+        socket.create_connection(("8.8.8.8", 53), timeout=1)
+        return False
+    except (OSError, socket.timeout):
+        return True
 
 
 @dataclass
