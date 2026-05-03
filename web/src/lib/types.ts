@@ -67,3 +67,30 @@ export type AssistResult = {
   change_log_path?: string | null;
   slack?: { sent: boolean; error?: string | null };
 };
+
+// === Auth/Provider Types ===
+
+export type Provider = 'openai' | 'anthropic' | 'google' | 'gateway';
+
+export type ProviderInfo = {
+  id: Provider;
+  name: string;
+  models: string[];
+  default_model: string | null;
+};
+
+export type AuthResponse = {
+  ok: boolean;
+  message: string;
+  provider?: string | null;
+  model?: string | null;
+  models?: string[] | null;
+};
+
+export type ProviderSetup = {
+  provider: string;
+  model: string;
+  api_key?: string;
+  api_base?: string;
+  enabled?: boolean;
+};
