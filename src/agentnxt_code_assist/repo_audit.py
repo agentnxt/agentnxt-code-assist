@@ -37,6 +37,7 @@ def audit_repo(repo_path: Path) -> list[RepoAnomaly]:
     _check_nextjs_claims(repo_path, lower_readme, anomalies)
     _check_platform_architecture_claims(repo_path, lower_readme, anomalies)
     _check_old_branding(repo_path, readme, anomalies)
+    _check_secrets(repo_path, anomalies)
 
     return anomalies
 
@@ -211,3 +212,47 @@ def _read_json(path: Path) -> dict[str, object] | None:
     except (OSError, json.JSONDecodeError):
         return None
     return data if isinstance(data, dict) else None
+
+
+# Secret detection patterns for security gate
+_SECRET_PATTERNS = [
+    # AWS
+    (r"(?i)(aws_access_key|aws_secret_key|aws_secret_access_key)\s*[=:]\s*['\"]?[A-Za-z0-9/+=]{20,40}['\"]?", "aws_credentials"),
+    # GitHub token
+    (r"(?i)(ghp_|gho_|ghu_|ghs_|ghr_)[A-Za-z0-9]{36,}", "github_token"),
+    # OpenAI key
+    (r"sk-[A-Za-z0-9]{20,}", "openai_key"),
+    # Anthropic key
+    (r"sk-ant-[A-Za-z0-9_-]{20,}", "anthropic_key"),
+    # Generic API key
+    (r"(?i)(api_key|apikey|secret|token)\s*[=:]\s*['\"]?[A-Za-z0-9_-]{16,}['\"]?", "api_credentials"),
+    # Private key
+    (r"-----BEGIN (RSA |EC |DSA |OPENSSH )?PRIVATE KEY-----", "private_key"),
+]
+
+
+def _check_secrets(repo_path: Path, anomalies: list[RepoAnomaly]) -> None:
+    """Check for exposed secrets in the repository."""
+    import re
+    for path in repo_path.rglob("*"):
+        if not path.is_file() or path.name.startswith("."):
+            continue
+        if path.suffix.lower() not in {".ts", ".tsx", ".js", ".jsx", ".py", ".json", ".yaml", ".yml", ".env", ".env.local", ".env.production"}:
+            continue
+        # Skip node_modules and common Generated paths
+        if "node_modules" in path.parts or "dist" in path.parts or "build" in path.parts:
+            continue
+        text = _read_text(path)
+        if not text:
+            continue
+        for pattern, secret_type in _SECRET_PATTERNS:
+            if re.search(pattern, text):
+                anomalies.append(
+                    RepoAnomaly(
+                        severity="error",
+                        code="secret_detected",
+                        message=f"Potential {secret_type} detected in {path.name}.",
+                        evidence=str(path.relative_to(repo_path)),
+                    )
+                )
+                return

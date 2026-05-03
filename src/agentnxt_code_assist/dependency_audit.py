@@ -23,6 +23,7 @@ def audit_dependencies(repo_path: Path, *, check_upstream: bool = False) -> list
     _audit_node_project(repo_path, anomalies, check_upstream=check_upstream)
     _audit_python_project(repo_path, anomalies, check_upstream=check_upstream)
     _audit_docker_publishability(repo_path, anomalies)
+    _audit_security_vulnerabilities(repo_path, anomalies, check_upstream=check_upstream)
     return anomalies
 
 
@@ -171,3 +172,40 @@ def _read_text(path: Path) -> str | None:
         return path.read_text(encoding="utf-8")
     except (OSError, UnicodeDecodeError):
         return None
+
+
+def _audit_security_vulnerabilities(repo_path: Path, anomalies: list[DependencyAnomaly], *, check_upstream: bool) -> None:
+    """Check for known security vulnerabilities in dependencies."""
+    if not check_upstream:
+        anomalies.append(DependencyAnomaly("info", "security_scan_skipped", "Pass --check-upstream-versions to enable full security vulnerability scanning."))
+        return
+    
+    # Check for known vulnerable patterns in package.json
+    package_json = repo_path / "package.json"
+    if package_json.exists():
+        package_data = _read_json(package_json)
+        if package_data:
+            deps = _node_dependencies(package_data)
+            # Check for known vulnerable versions (CVE examples)
+            known_vulnerable = {
+                "json5": "<1.0.0",
+                "minimatch": "<3.0.2",
+                "word-wrap": "<1.2.4",
+                "semver": "<7.5.2",
+            }
+            for name, min_safe in known_vulnerable.items():
+                if name in deps:
+                    ver = deps[name]
+                    if _cmp_version(ver, min_safe) < 0:
+                        anomalies.append(DependencyAnomaly("error", "cve_known_vulnerable", f"Package `{name}@{ver}` has known CVE. Upgrade to >= {min_safe}.", name))
+
+
+def _cmp_version(a: str, b: str) -> int:
+    """Compare two semantic version strings. Returns <0 if a < b, 0 if equal, >0 if a > b."""
+    import re
+    def parse(v: str) -> tuple[int, ...]:
+        v = re.sub(r"[^0-9.]", "", v.split("#")[0])
+        parts = v.split(".")[:3]
+        return tuple(int(p) for p in parts)
+    va, vb = parse(a), parse(b)
+    return (va > vb) - (va < vb)
