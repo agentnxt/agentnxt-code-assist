@@ -52,7 +52,8 @@ export default function HomePage() {
   const [providerApiBase, setProviderApiBase] = useState('');
   const [dryRun, setDryRun] = useState(false);
   const [localModelInstalled, setLocalModelInstalled] = useState(false);
-  const [modelInfo, setModelInfo] = useState<{installed: string[], available: Record<string, string>}>({installed: [], available: {}});
+  const [isAirGapped, setIsAirGapped] = useState(false);
+  const [modelInfo, setModelInfo] = useState<{installed: string[], available: Record<string, string>, air_gapped: boolean}>({installed: [], available: {}, air_gapped: false});
   const [notifySlack, setNotifySlack] = useState(false);
   const [checkUpstream, setCheckUpstream] = useState(false);
   const [allowCommits, setAllowCommits] = useState(false);
@@ -79,6 +80,7 @@ export default function HomePage() {
       try {
         const localInfo = await listLocalModels();
         setModelInfo(localInfo);
+        setIsAirGapped(localInfo.air_gapped);
         setLocalModelInstalled(localInfo.installed.length > 0 || Object.keys(localInfo.available).length > 0);
       } catch {
         // Local models not available
@@ -273,7 +275,11 @@ export default function HomePage() {
             {provider === 'local' && (
               <div className="local-options">
                 <p className="muted">
-                  Local models run offline using llama.cpp - useful when API limits are exhausted.
+                  {isAirGapped ? (
+                    <>🔒 Air-gapped mode - only local models available</>
+                  ) : (
+                    <>Local models run offline using llama.cpp - useful when API limits are exhausted.</>
+                  )}
                   {!localModelInstalled && " Install llama.cpp first: "}
                   {localModelInstalled && " Available: "}
                   {localModelInstalled && modelInfo.available.map((m: string) => <span key={m} className="chip">{m}</span>)}

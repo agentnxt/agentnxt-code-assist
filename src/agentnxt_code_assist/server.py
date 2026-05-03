@@ -180,9 +180,13 @@ from agentnxt_code_assist.local_llm import MODELS, download_model, get_fallback_
 @ app.get("/local/models")
 def list_local_models() -> dict[str, any]:
     """List available local models."""
+    # Check if air-gapped mode
+    from agentnxt_code_assist.local_llm import is_air_gapped
+    
     return {
         "installed": get_installed_models(),
         "available": MODELS,
+        "air_gapped": is_air_gapped(),
     }
 
 
