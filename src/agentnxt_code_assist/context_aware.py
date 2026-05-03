@@ -109,18 +109,31 @@ class SessionContext:
     task_id: str | None = None
     objective: str = ""
     
+    # Timeline constraints
+    deadline: str | None = None  # ISO timestamp
+    started_at: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
+    last_activity: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
+    
+    # Cost constraints
+    max_tokens: int = 0  # 0 = unlimited
+    max_cost_usd: float = 0.0  # 0 = unlimited
+    budget_exceeded: bool = False
+    
+    # Constraints
+    max_files: int = 0  # 0 = unlimited
+    max_changes: int = 0  # 0 = unlimited
+    allowed_paths: list[str] = field(default_factory=list)  # empty = all
+    blocked_paths: list[str] = field(default_factory=list)
+    
     # History
     messages_count: int = 0
+    tokens_used: int = 0
     files_modified: int = 0
     decisions_logged: int = 0
     
     # Progress
     current_step: int = 0
     total_steps: int = 0
-    
-    # Audit
-    started_at: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
-    last_activity: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
     
     def to_prompt_text(self) -> str:
         lines = ["## Session Context"]
@@ -129,6 +142,21 @@ class SessionContext:
         
         if self.objective:
             lines.append(f"- Objective: {self.objective[:100]}")
+        
+        # Timeline
+        if self.deadline:
+            lines.append(f"- Deadline: {self.deadline}")
+        
+        # Cost
+        if self.max_cost_usd > 0:
+            lines.append(f"- Budget: ${self.max_cost_usd:.2f}")
+            lines.append(f"- Tokens: {self.tokens_used:,}")
+        
+        # Constraints
+        if self.max_files > 0:
+            lines.append(f"- Max files: {self.max_files}")
+        if self.max_changes > 0:
+            lines.append(f"- Max changes: {self.max_changes}")
         
         lines.append(f"- Messages: {self.messages_count}")
         lines.append(f"- Files modified: {self.files_modified}")
@@ -279,6 +307,8 @@ def update_context(
     files_modified: int | None = None,
     decision: str | None = None,
     error: str | None = None,
+    tokens_used: int | None = None,
+    cost_usd: float | None = None,
 ) -> AgentContext:
     """Update context with new information."""
     if task_id:
@@ -297,9 +327,78 @@ def update_context(
     if error:
         ctx.recent_errors.append(error)
         ctx.recent_errors = ctx.recent_errors[-10:]  # Keep last 10
+    if tokens_used is not None:
+        ctx.session.tokens_used = tokens_used
+    if cost_usd is not None:
+        # Check budget
+        if ctx.session.max_cost_usd > 0 and cost_usd > ctx.session.max_cost_usd:
+            ctx.session.budget_exceeded = True
     
     ctx.session.last_activity = datetime.now(UTC).isoformat()
     return ctx
+
+
+def check_constraints(
+    ctx: AgentContext,
+    *,
+    files_to_change: list[str] | None = None,
+    estimated_tokens: int | None = None,
+) -> tuple[bool, str]:
+    """Check if proposed changes violate constraints.
+    
+    Returns: (allowed, reason)
+    """
+    session = ctx.session
+    
+    # Check timeline
+    if session.deadline:
+        deadline_dt = datetime.fromisoformat(session.deadline.replace("Z", "+00:00"))
+        if datetime.now(UTC) > deadline_dt:
+            return False, "Deadline exceeded"
+    
+    # Check budget
+    if session.budget_exceeded:
+        return False, "Budget exceeded"
+    
+    # Check tokens
+    if estimated_tokens and session.max_tokens > 0:
+        if session.tokens_used + estimated_tokens > session.max_tokens:
+            return False, "Token limit would be exceeded"
+    
+    # Check file limits
+    if files_to_change and session.max_files > 0:
+        if len(files_to_change) > session.max_files:
+            return False, f"Max {session.max_files} files allowed"
+    
+    # Check blocked paths
+    if files_to_change and session.blocked_paths:
+        for path in files_to_change:
+            for blocked in session.blocked_paths:
+                if blocked in path:
+                    return False, f"Path {path} is blocked"
+    
+    # Check allowed paths
+    if files_to_change and session.allowed_paths:
+        for path in files_to_change:
+            allowed = False
+            for allowed_path in session.allowed_paths:
+                if path.startswith(allowed_path):
+                    allowed = True
+                    break
+            if not allowed:
+                return False, f"Path {path} not in allowed list"
+    
+    return True, "OK"
+
+
+def get_remaining_budget(ctx: AgentContext) -> dict[str, float]:
+    """Get remaining budget information."""
+    session = ctx.session
+    return {
+        "tokens_remaining": max(0, session.max_tokens - session.tokens_used) if session.max_tokens > 0 else -1,
+        "cost_remaining": max(0, session.max_cost_usd - (session.tokens_used * 0.00001)) if session.max_cost_usd > 0 else -1,  # rough estimate
+        "files_remaining": max(0, session.max_files - session.files_modified) if session.max_files > 0 else -1,
+    }
 
 
 # === Context Persistence ===
