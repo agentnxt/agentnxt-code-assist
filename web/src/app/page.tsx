@@ -261,7 +261,7 @@ export default function HomePage() {
                     const res = await loginWithProvider(provider);
                     // Open provider login in new tab/window
                     window.open(res.redirect, '_blank', 'width=600,height=700');
-                    setAuthMessage('Please sign in with ' + provider + ' in the new window, then return here');
+                    setAuthMessage(`Please sign in with ${provider} in the new window. After signing in, your API key will be auto-created and stored securely for this session. You can also manage your API keys at: ${provider === 'openai' ? 'platform.openai.com/settings' : provider === 'anthropic' ? 'console.anthropic.com/settings' : 'aistudio.google.com/app'}`);
                   } catch (e) {
                     setError(e instanceof Error ? e.message : 'Failed to initiate login');
                   } finally {
