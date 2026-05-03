@@ -1,7 +1,7 @@
 'use client';
 
 import { FormEvent, useMemo, useState, useEffect } from 'react';
-import { runAssist, listProviders, getProvider, loginWithProvider } from '../lib/api';
+import { runAssist, listProviders, getProvider, loginWithProvider, listLocalModels } from '../lib/api';
 import type { AssistResult, AuthResponse } from '../lib/types';
 
 const CHECK_PRESETS = [
@@ -51,6 +51,8 @@ export default function HomePage() {
   const [providerModels, setProviderModels] = useState<string[]>([]);
   const [providerApiBase, setProviderApiBase] = useState('');
   const [dryRun, setDryRun] = useState(false);
+  const [localModelInstalled, setLocalModelInstalled] = useState(false);
+  const [modelInfo, setModelInfo] = useState<{installed: string[], available: Record<string, string>}>({installed: [], available: {}});
   const [notifySlack, setNotifySlack] = useState(false);
   const [checkUpstream, setCheckUpstream] = useState(false);
   const [allowCommits, setAllowCommits] = useState(false);
@@ -71,8 +73,16 @@ export default function HomePage() {
   async function loadProviders() {
     try {
       const res = await listProviders();
-      // Could store provider list here if needed
       setProviderModels(['gpt-4o', 'gpt-4-turbo', 'gpt-3.5-turbo']);
+      
+      // Check for local models
+      try {
+        const localInfo = await listLocalModels();
+        setModelInfo(localInfo);
+        setLocalModelInstalled(localInfo.installed.length > 0 || Object.keys(localInfo.available).length > 0);
+      } catch {
+        // Local models not available
+      }
     } catch (e) {
       console.error('Failed to load providers:', e);
     }
@@ -223,7 +233,7 @@ export default function HomePage() {
 
           <section className="panel settings-panel">
             <h2>Provider Settings</h2>
-            <p className="muted">Sign in with your provider account to automatically get an API key</p>
+            <p className="muted">Sign in with your provider account to automatically get an API key, or use a local model when API limits are exhausted</p>
             
             <label>
               Provider
@@ -237,9 +247,35 @@ export default function HomePage() {
                 <option value="openai">OpenAI</option>
                 <option value="anthropic">Anthropic (Claude)</option>
                 <option value="google">Google (Gemini)</option>
+                <option value="local">Local (llama.cpp)</option>
                 <option value="gateway">Custom Gateway</option>
               </select>
             </label>
+
+            {provider === 'local' && (
+              <div className="local-options">
+                <p className="muted">
+                  Local models run offline using llama.cpp - useful when API limits are exhausted.
+                  {!localModelInstalled && " Install llama.cpp first: "}
+                  {localModelInstalled && " Available: "}
+                  {localModelInstalled && modelInfo.available.map((m: string) => <span key={m} className="chip">{m}</span>)}
+                </p>
+                {!localModelInstalled && (
+                  <button className="chip" onClick={() => window.open('https://github.com/ggerganov/llama.cpp', '_blank')}>
+                    Install llama.cpp
+                  </button>
+                )}
+                {localModelInstalled && modelInfo.installed.length === 0 && (
+                  <button className="chip" onClick={() => {
+                    // Download first available model
+                    const modelToDownload = Object.keys(modelInfo.available)[0];
+                    // TODO: trigger download
+                  }}>
+                    Download {modelToDownload}
+                  </button>
+                )}
+              </div>
+            )}
 
             {provider === 'gateway' && (
               <label>

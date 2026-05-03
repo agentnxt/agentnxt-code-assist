@@ -170,3 +170,46 @@ def remove_provider(provider: str) -> AuthResponse:
         message=f"Provider {provider} removed",
         provider=provider,
     )
+
+
+# === Local Model/Fallback API ===
+
+from agentnxt_code_assist.local_llm import MODELS, download_model, get_fallback_instructions, get_installed_models, is_llama_cpp_installed, run_local_model
+
+
+@ app.get("/local/models")
+def list_local_models() -> dict[str, any]:
+    """List available local models."""
+    return {
+        "installed": get_installed_models(),
+        "available": MODELS,
+    }
+
+
+@app.post("/local/run")
+async def run_local(prompt: dict[str, str]) -> dict[str, str]:
+    """Run a prompt through local llama.cpp model."""
+    from fastapi import HTTPException
+    
+    if not is_llama_cpp_installed():
+        raise HTTPException(
+            status_code=503,
+            detail="llama.cpp not installed. Run: agennext-code-assist local help",
+        )
+    
+    try:
+        result = await run_local_model(
+            prompt.get("prompt", ""),
+            model=prompt.get("model", "llama3-8b"),
+            max_tokens=prompt.get("max_tokens", 2048),
+            temperature=prompt.get("temperature", 0.7),
+        )
+        return {"output": result}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/local/help")
+def get_local_help() -> dict[str, str]:
+    """Get fallback setup instructions."""
+    return {"instructions": get_fallback_instructions()}
