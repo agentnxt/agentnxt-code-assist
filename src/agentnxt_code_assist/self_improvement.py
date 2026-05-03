@@ -1,25 +1,30 @@
 """Self-improvement for the agent: learns from execution results.
 
-Tracks:
-- What skills/tools work best for different tasks
-- Success rates of different approaches
-- Constraint effectiveness  
-- Performance metrics
-- Auto-updates skills based on outcomes
+SELF-IMPROVEMENT LOOP (continuous):
+1. Before: Recommend skills/tools based on history
+2. During: Monitor progress, detect stalls
+3. After: Record results, analyze patterns
+4. Auto-improve: Update skills/tools/constraints
+5. Next: Better recommendations
+
+This runs continuously - after every execution cycle.
 """
 
 from __future__ import annotations
 
 from collections import defaultdict
 from dataclasses import dataclass, field
-from datetime import datetime, UTC
+from datetime import datetime, timedelta, UTC
 from pathlib import Path
+from threading import Thread
 from typing import Any
+from uuid import uuid4
 
 import json
+import time
 
 
-# === Execution Metrics ===
+# === Execution Result ===
 
 @dataclass
 class ExecutionResult:
@@ -604,7 +609,247 @@ def get_optimized_context(
     return "\n".join(lines)
 
 
-# === Singleton ===
+# === Continuous Self-Improvement Loop ===
+
+class SelfImprovementLoop:
+    """Continuous self-improvement that runs in the background.
+    
+    THE LOOP:
+    ┌─────────────────────────────────────────────────────────────────────┐
+    │                                                     │
+    │  ┌─────────┐   Execute   ┌─────────┐   After    │
+    │  │ Before  │──>Task     │──>During  │──>Record  │
+    │  │(recommend)          │(monitor)  │(result)  │
+    │  └────┬────┘           └────┬─────┘   └────┬────┘
+    │       │                    │           │
+    │       │                    ▼           ▼
+    │       │            ┌───────────────┐
+    │       │            │  Detect      │
+    │       │            │  Stalls/     │
+    │       │            │  Issues     │
+    │       │            └──────┬──────┘
+    │       │                   │
+    │       ◄──────────────────┘
+    │       │
+    │       ▼
+    │  ┌─────────┐
+    │  │ Auto    │──>Improve──>Better──>Back to start
+    │  │ Improve │
+    │  └─────────┘
+    │                                                     │
+    └───────────────────────────────────────────────────────
+    """
+    
+    def __init__(
+        self,
+        storage_path: Path | None = None,
+        loop_interval_seconds: int = 300,  # 5 min between loops
+    ):
+        self.storage_path = storage_path or Path(".agennext/self_improvement")
+        self.engine = SelfImprovementEngine(self.storage_path)
+        
+        # Loop control
+        self.loop_interval = loop_interval_seconds
+        self._running = False
+        self._thread: Thread | None = None
+        
+        # Current session tracking
+        self.current_run_id: str | None = None
+        self.run_start_time: datetime | None = None
+        self.progress_milestones: list[tuple[int, str]] = []  # (seconds, milestone)
+        self.last_progress: datetime | None = None
+    
+    def start_loop(self):
+        """Start the continuous improvement loop."""
+        if self._running:
+            return
+        
+        self._running = True
+        self._thread = Thread(target=self._run_loop, daemon=True)
+        self._thread.start()
+    
+    def stop_loop(self):
+        """Stop the continuous improvement loop."""
+        self._running = False
+        if self._thread:
+            self._thread.join(timeout=5)
+    
+    def _run_loop(self):
+        """Background loop that periodically improves."""
+        while self._running:
+            try:
+                # Run auto-improvement
+                self._periodic_improve()
+                
+                # Sleep until next iteration
+                for _ in range(self.loop_interval):
+                    if not self._running:
+                        break
+                    time.sleep(1)
+            
+            except Exception as e:
+                print(f"Improvement loop error: {e}")
+                time.sleep(60)  # Wait before retry
+    
+    def _periodic_improve(self):
+        """Run periodic improvements."""
+        # Check if there are enough results to learn from
+        if len(self.engine.skill_performance) < 3:
+            return  # Not enough data yet
+        
+        # Run auto-improvement
+        try:
+            from agentnxt_code_assist.skill_registry import get_skills_registry
+            from agentnxt_code_assist.tool_registry import get_registry
+            
+            auto_improve_all(
+                skills_registry=get_skills_registry(),
+                tools_registry=get_registry(),
+                metrics_path=self.storage_path,
+            )
+        except ImportError:
+            pass
+    
+    # === Before: Get Recommendations ===
+    
+    def get_recommendations(
+        self,
+        objective: str,
+    ) -> dict[str, Any]:
+        """Get optimized recommendations before execution."""
+        # Get skill recommendations
+        skills = self.engine.get_recommended_skills(objective)
+        
+        # Get tool recommendations  
+        tools = self.engine.get_recommended_tools(objective)
+        
+        # Get constraint suggestions
+        constraints = suggest_better_constraints(self.engine.storage_path)
+        
+        return {
+            "recommended_skills": skills,
+            "recommended_tools": tools,
+            "suggested_constraints": constraints,
+            "confidence": "high" if len(self.engine.skill_performance) > 5 else "low",
+        }
+    
+    # === During: Monitor Progress ===
+    
+    def start_monitoring(
+        self,
+        run_id: str,
+        objective: str,
+        expected_duration_seconds: int = 300,
+    ):
+        """Start monitoring a run."""
+        self.current_run_id = run_id
+        self.run_start_time = datetime.now(UTC)
+        self.progress_milestones = [
+            (expected_duration_seconds // 4, "25%"),
+            (expected_duration_seconds // 2, "50%"),
+            (expected_duration_seconds * 3 // 4, "75%"),
+            (expected_duration_seconds, "complete"),
+        ]
+    
+    def check_progress(self) -> tuple[bool, str]:
+        """Check if execution is progressing well.
+        
+        Returns: (is_stalled, message)
+        """
+        if not self.run_start_time or not self.current_run_id:
+            return False, ""
+        
+        # Calculate elapsed
+        elapsed = (datetime.now(UTC) - self.run_start_time).total_seconds()
+        
+        # Check for stall (no progress in 60s)
+        if self.last_progress:
+            since_last = (datetime.now(UTC) - self.last_progress).total_seconds()
+            if since_last > 60:
+                return True, "No progress in 60 seconds - might be stalled"
+        
+        # Check milestone
+        for threshold, milestone in self.progress_milestones:
+            if elapsed > threshold and milestone != "complete":
+                # Still going after this long
+                if elapsed > threshold * 1.5:
+                    return True, f"Taking longer than expected ({milestone})"
+        
+        return False, ""
+    
+    def record_progress(self):
+        """Record progress checkpoint."""
+        self.last_progress = datetime.now(UTC)
+    
+    # === After: Record Results ===
+    
+    def complete(
+        self,
+        result: ExecutionResult,
+        run_id: str | None = None,
+    ):
+        """Record execution result."""
+        if run_id:
+            self.current_run_id = None
+            self.run_start_time = None
+        
+        # Record in engine
+        self.engine.record_result(result)
+        
+        # Check if we should run immediate improvement
+        if result.success and len(self.engine.skill_performance) >= 10:
+            # Good time to learn
+            try:
+                self._periodic_improve()
+            except Exception:
+                pass
+    
+    # === Continuous: Status ===
+    
+    def get_loop_status(self) -> dict[str, Any]:
+        """Get current loop status."""
+        return {
+            "running": self._running,
+            "data_points": len(self.engine.skill_performance),
+            "current_run": self.current_run_id,
+            "uptime_seconds": (
+                (datetime.now(UTC) - self.run_start_time).total_seconds()
+                if self.run_start_time else 0
+            ),
+        }
+
+
+# === Singleton Loop ===
+
+_loop: SelfImprovementLoop | None = None
+
+
+def start_self_improvement_loop(
+    loop_interval: int = 300,
+) -> SelfImprovementLoop:
+    """Start the continuous self-improvement loop."""
+    global _loop
+    
+    _loop = SelfImprovementLoop(
+        loop_interval_seconds=loop_interval,
+    )
+    _loop.start_loop()
+    
+    return _loop
+
+
+def stop_self_improvement_loop():
+    """Stop the continuous self-improvement loop."""
+    global _loop
+    
+    if _loop:
+        _loop.stop_loop()
+        _loop = None
+
+
+def get_self_improvement_loop() -> SelfImprovementLoop | None:
+    """Get the current loop."""
+    return _loop
 
 _engine: SelfImprovementEngine | None = None
 
