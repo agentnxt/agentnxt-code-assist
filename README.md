@@ -695,3 +695,113 @@ The test configuration is in `web/playwright.config.ts` and includes:
 - Chromium, Firefox, and WebKit browser testing
 - HTML test reporting
 - Automatic server startup during tests
+
+---
+
+## Advanced Modules
+
+### Continuous Improvement System
+
+Track bugs, analyze root causes, and generate improvement recommendations.
+
+```python
+from agennext_codeassist.continuous_improvement import get_improver
+
+improver = get_improver()
+improver.log_bug(
+    exception_type="ValueError",
+    context={"file": "auth.py", "function": "validate_token"},
+    severity="high"
+)
+```
+
+**API Endpoints:**
+- `POST /improvements/bugs` - Log a bug
+- `GET /improvements/bugs` - List bugs
+- `GET /improvements/recommendations` - Get improvements
+- `POST /improvements/bugs/{id}/fix` - Mark fixed
+
+### Process Excellence
+
+Track task timing and auto-suggest improvements for repeat tasks.
+
+```python
+from agennext_codeassist.process_excellence import start_task, complete_task
+
+task_id = start_task("encode_video", {"format": "mp4"})
+# ... do work ...
+duration = complete_task(task_id)
+```
+
+If a repeat task takes same/longer time, the system analyzes and suggests:
+- Caching
+- Parallelization
+- Skip logic
+
+**API Endpoints:**
+- `POST /processes/tasks/start` - Start tracking
+- `POST /processes/tasks/{id}/complete` - Complete & analyze
+- `GET /processes/improvements` - Pending improvements
+- `POST /processes/improvements/{id}/approve` - Approve improvement
+
+### Project Management
+
+Manage projects, tasks, milestones, and dependencies.
+
+```python
+from agennext_codeassist.project_management import get_manager
+
+manager = get_manager()
+project_id = manager.create_project("New Feature", "Description")
+task_id = manager.add_task(project_id, "Implement login", priority="high")
+manager.add_dependency(task_id, db_task_id, "blocks")
+```
+
+**API Endpoints:**
+- `POST /projects` - Create project
+- `POST /projects/{id}/tasks` - Add task
+- `POST /projects/{id}/milestones` - Add milestone
+- `POST /projects/{id}/dependencies` - Add dependency
+
+### Daily Status Reports
+
+End-of-day reports with email and Slack notifications.
+
+```python
+from agennext_codeassist.daily_status import get_reporter
+
+reporter = get_reporter()
+reporter.add_completed_task("Added login", "OAuth flow")
+reporter.add_plan("Add logout", "high")
+reporter.add_blocker("API rate limit", "medium")
+reporter.send_all()  # Email + Slack
+```
+
+**Environment:**
+- `AGENNEXT_CODE_ASSIST_SMTP_URL`
+- `AGENNEXT_CODE_ASSIST_SMTP_FROM_EMAIL`
+- `AGENNEXT_CODE_ASSIST_SMTP_TO_EMAIL`
+- `SLACK_WEBHOOK_URL`
+
+### Jira Integration
+
+Sync with Jira issues and projects.
+
+```python
+from agennext_codeassist.jira_integration import get_jira
+
+jira = get_jira()
+jira.create_issue("Fix login bug", "Priority: High", JiraPriority.HIGH)
+jira.sync_to_jira(project_id)
+```
+
+**Environment:**
+- `JIRA_URL`
+- `JIRA_EMAIL`
+- `JIRA_API_TOKEN`
+- `JIRA_PROJECT_KEY`
+
+**API Endpoints:**
+- `POST /jira/issues` - Create issue
+- `POST /jira/sync/{project_id}/to` - Sync to Jira
+- `POST /jira/sync/{project_id}/from` - Sync from Jira
