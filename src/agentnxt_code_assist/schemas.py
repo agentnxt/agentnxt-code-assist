@@ -70,6 +70,23 @@ class AssistRequest(BaseModel):
     smtp_from_email: str | None = None
     smtp_to_email: str | None = None
 
+    # Advanced Agent Capabilities
+    enable_empathy: bool = False
+    empathy_mode: str = "adaptive"
+    enable_self_respect: bool = False
+    enable_trust_framework: bool = False
+    enable_situation_awareness: bool = False
+    enable_self_improvement: bool = False
+
+    # Tool Ecosystem
+    enable_travel_tools: bool = False
+    enable_weather_tools: bool = False
+    enable_map_tools: bool = False
+    enable_news_tools: bool = False
+    enable_user_profile: bool = False
+    enable_skill_registry: bool = False
+    enable_rag_knowledge: bool = False
+
     # Write/remote-operation guardrails. These must be explicitly authorized.
     allow_commits: bool = False
     allow_push: bool = False
@@ -185,3 +202,21 @@ class AssistResult(BaseModel):
     slack: NotificationResult = Field(default_factory=NotificationResult)
     webhook: NotificationResult = Field(default_factory=NotificationResult)
     smtp: NotificationResult = Field(default_factory=NotificationResult)
+
+    # Advanced Agent Capabilities Response Fields
+    empathy_state: str | None = None
+    empathy_score: float | None = None
+    self_respect_boundaries: dict[str, bool] | None = None
+    trust_score: float | None = None
+    situation_context: dict[str, Any] | None = None
+    improvements_applied: list[str] = Field(default_factory=list)
+    decision_logs: list[dict[str, Any]] = Field(default_factory=list)
+
+    # Tool Ecosystem Response Fields
+    travel_data: dict[str, Any] | None = None
+    weather_data: dict[str, Any] | None = None
+    map_data: dict[str, Any] | None = None
+    news_data: dict[str, Any] | None = None
+    user_profile_data: dict[str, Any] | None = None
+    registered_skills: list[str] = Field(default_factory=list)
+    rag_knowledge_results: list[dict[str, Any]] = Field(default_factory=list)
