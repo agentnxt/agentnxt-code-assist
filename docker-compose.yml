@@ -1,7 +1,7 @@
 services:
   agennext-code-assist:
     build: .
-    image: ghcr.io/agennext/agennext-code-assist:latest
+    image: agennext/code-assist:latest
     expose:
       - "8090"
     ports:
@@ -27,7 +27,7 @@ services:
   agennext-code-assist-web:
     build:
       context: ./web
-    image: ghcr.io/agennext/agennext-code-assist-web:latest
+    image: agennext/code-assist-web:latest
     expose:
       - "3000"
     ports:

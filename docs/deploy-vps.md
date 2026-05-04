@@ -1,81 +1,76 @@
-# VPS Deployment Scripts
+# Deploy CodeAssist from Docker Hub
 
-Run these on your local machine to deploy to `ubuntu@Static@12@vps.openautonomyx.com`.
-
-## Option 1: Git Clone (Recommended)
+## Quick Deploy
 
 ```bash
-# SSH into the server
+# SSH into your VPS
 ssh ubuntu@vps.openautonomyx.com
 
-# Clone and setup
-sudo mkdir -p /opt/codeassist
-cd /opt/codeassist
-git clone https://github.com/AGenNext/CodeAssist.git .
-
-# Create virtual environment
-python3 -m venv venv
-source venv/bin/activate
-pip install -e .
-
-# Create systemd service
-sudo nano /etc/systemd/system/codeassist.service
-
-# Enable and start
-sudo systemctl daemon-reload
-sudo systemctl enable codeassist
-sudo systemctl start codeassist
-```
-
-Systemd service content:
-```ini
-[Unit]
-Description=CodeAssist API
-After=network.target
-
-[Service]
-User=ubuntu
-Group=ubuntu
-WorkingDirectory=/opt/codeassist
-Environment=PATH=/opt/codeassist/venv/bin
-ExecStart=/opt/codeassist/venv/bin/agennext-code-assist serve --host 0.0.0.0 --port 8090
-Restart=always
-
-[Install]
-WantedBy=multi-user.target
-```
-
-## Option 2: Docker
-
-```bash
-# On VPS
-sudo apt update
-sudo apt install -y docker.io docker-compose
-
-# Clone and start
-git clone https://github.com/AGenNext/CodeAssist.git
-cd CodeAssist
-sudo docker-compose up -d
+# Run Docker container directly
+docker run -d \
+  --name codeassist \
+  -p 8090:8090 \
+  -e OPENAI_API_KEY=your-key-here \
+  agennext/code-assist:latest
 
 # Access at http://your-vps-ip:8090
 ```
 
-## Option 3: Python Directly
+## With Docker Compose
 
 ```bash
-# SSH into server
+# SSH into VPS
 ssh ubuntu@vps.openautonomyx.com
 
-# Install
-git clone https://github.com/AGenNext/CodeAssist.git
-cd CodeAssist
-pip install -e .
+# Install Docker if needed
+sudo apt update
+sudo apt install -y docker.io docker-compose
 
-# Run in screen/tmux or with nohup
-nohup agennext-code-assist serve --host 0.0.0.0 --port 8090 > server.log 2>&1 &
+# Create compose file
+cat > docker-compose.yml << 'EOF'
+services:
+  codeassist:
+    image: agennext/code-assist:latest
+    ports:
+      - "8090:8090"
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+    restart: unless-stopped
+EOF
+
+# Create .env file
+echo "OPENAI_API_KEY=your-key" > .env
+
+# Start
+docker-compose up -d
 ```
 
-## Access
+## With Web UI
 
-- API: http://vps.openautonomyx.com:8090
-- Docs: http://vps.openautonomyx.com:8090/docs
+```bash
+cat > docker-compose.yml << 'EOF'
+services:
+  api:
+    image: agennext/code-assist:latest
+    ports:
+      - "8090:8090"
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+    restart: unless-stopped
+  
+  web:
+    image: agennext/code-assist-web:latest
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_AGENNEXT_CODE_ASSIST_API_URL=http://api:8090
+    depends_on:
+      - api
+    restart: unless-stopped
+EOF
+
+docker-compose up -d
+
+# API: http://your-vps:8090
+# Web: http://your-vps:3000
+```
