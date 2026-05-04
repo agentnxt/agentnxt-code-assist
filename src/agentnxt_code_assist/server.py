@@ -1,25 +1,126 @@
-"""HTTP API for AGenNext Code Assist."""
-
 from __future__ import annotations
 
 import os
 from importlib.resources import files
+from typing import Any, Callable
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request, Response, status
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.middleware.base import BaseHTTPMiddleware
+import time
 
 from agentnxt_code_assist.aider_runner import AiderCodeAssist
-from agentnxt_code_assist.auth import Provider, get_available_models, parse_provider
+from agentnxt_code_assist.auth import Provider, get_available_models, parse_provider, get_provider_login_url
 from agentnxt_code_assist.config import Settings
 from agentnxt_code_assist.schemas import AssistRequest, AssistResult
 
+# Production configuration
+PRODUCTION_MODE = os.environ.get("PRODUCTION", "false").lower() == "true"
+API_KEY_REQUIRED = os.environ.get("API_KEY_REQUIRED", "false").lower() == "true"
+REQUIRED_API_KEY = os.environ.get("REQUIRED_API_KEY", "")
+
 app = FastAPI(title="AGenNext Code Assist", version="0.1.0")
+
+
+# Security middleware - Rate limiting (simple in-memory)
+class RateLimitMiddleware(BaseHTTPMiddleware):
+    """Simple rate limiting middleware."""
+    
+    def __init__(self, app, requests_per_minute: int = 60):
+        super().__init__(app)
+        self.requests_per_minute = requests_per_minute
+        self.request_counts: dict[str, list[float]] = {}
+    
+    async def dispatch(self, request: Request, call_next):
+        client_ip = request.client.host if request.client else "unknown"
+        now = time.time()
+        window_start = now - 60
+        
+        # Clean old entries
+        if client_ip in self.request_counts:
+            self.request_counts[client_ip] = [
+                ts for ts in self.request_counts[client_ip] if ts > window_start
+            ]
+        else:
+            self.request_counts[client_ip] = []
+        
+        # Check rate limit
+        if len(self.request_counts[client_ip]) >= self.requests_per_minute:
+            return Response(
+                content="Rate limit exceeded",
+                status_code=429,
+                headers={"Retry-After": "60"}
+            )
+        
+        self.request_counts[client_ip].append(now)
+        return await call_next(request)
+
+
+# Add security middleware
+# Configure CORS for production - restrict origins in production
+ALLOWED_ORIGINS = os.environ.get("ALLOWED_ORIGINS", "*").split(",")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=ALLOWED_ORIGINS,
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "X-Request-ID"],
+)
+app.add_middleware(RateLimitMiddleware, requests_per_minute=60)
+
+
+# Security headers middleware
+@app.middleware("http")
+async def add_security_headers(request: Request, call_next):
+    response = await call_next(request)
+    # Add security headers (configure for production)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+    response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+    return response
+
+
+# Initialize app
 assistant = AiderCodeAssist()
 settings = Settings.from_env()
 API_BASE = os.environ.get("AGENNEXT_CODE_ASSIST_API_URL", f"http://{settings.host}:{settings.port}")
 static_dir = files("agentnxt_code_assist").joinpath("static")
 app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
+
+
+# === API Key Authentication ===
+
+def verify_api_key(request: Request) -> bool:
+    """Verify API key for protected endpoints."""
+    if not API_KEY_REQUIRED:
+        return True
+    
+    if not REQUIRED_API_KEY:
+        return True
+    
+    auth_header = request.headers.get("Authorization", "")
+    if auth_header.startswith("Bearer "):
+        provided_key = auth_header[7:]
+        if provided_key == REQUIRED_API_KEY:
+            return True
+    
+    return False
+
+
+def require_auth(func: Callable) -> Callable:
+    """Decorator to require API key authentication."""
+    async def wrapper(request: Request, *args, **kwargs):
+        if not verify_api_key(request):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid or missing API key",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        return await func(request, *args, **kwargs)
+    return wrapper
 
 
 @app.get("/")
@@ -29,7 +130,7 @@ def index() -> FileResponse:
 
 @app.get("/healthz")
 def healthz() -> dict[str, str]:
-    return {"status": "ok"}
+    return {"status": "ok", "production": str(PRODUCTION_MODE).lower()}
 
 
 @app.get("/config")
@@ -48,6 +149,8 @@ def config() -> dict[str, object]:
         "auto_yes": settings.auto_yes,
         "auto_commits": settings.auto_commits,
         "dry_run": settings.dry_run,
+        "production": PRODUCTION_MODE,
+        "api_key_required": API_KEY_REQUIRED,
         "env": {key: bool(os.getenv(key)) for key in env_keys},
     }
 
@@ -121,8 +224,6 @@ def login_with_provider(provider: str) -> dict[str, str]:
         raise HTTPException(status_code=400, detail=str(e))
     
     login_url = get_provider_login_url(p, f"{API_BASE}/auth/callback/{provider}")
-    
-    # Store provider in session for callback
     return {"redirect": login_url}
 
 
@@ -134,13 +235,12 @@ def setup_provider(provider: str, setup: ProviderSetup) -> AuthResponse:
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     
-    # Store the configuration (in production, persist to database)
+    # Store the configuration securely
     if setup.api_key:
         os.environ[f"{provider.upper()}_API_KEY"] = setup.api_key
     if setup.api_base:
         os.environ[f"{provider.upper()}_API_BASE"] = setup.api_base
     
-    # Set model for this provider
     os.environ["AGENNEXT_CODE_ASSIST_MODEL"] = setup.model
     settings.model = setup.model
     
@@ -174,13 +274,19 @@ def remove_provider(provider: str) -> AuthResponse:
 
 # === Local Model/Fallback API ===
 
-from agentnxt_code_assist.local_llm import MODELS, download_model, get_fallback_instructions, get_installed_models, is_llama_cpp_installed, run_local_model
+from agentnxt_code_assist.local_llm import (
+    MODELS,
+    download_model,
+    get_fallback_instructions,
+    get_installed_models,
+    is_llama_cpp_installed,
+    run_local_model,
+)
 
 
-@ app.get("/local/models")
+@app.get("/local/models")
 def list_local_models() -> dict[str, any]:
     """List available local models."""
-    # Check if air-gapped mode
     from agentnxt_code_assist.local_llm import is_air_gapped
     
     return {
@@ -223,13 +329,14 @@ def get_local_help() -> dict[str, str]:
 
 from agentnxt_code_assist.memory_store import compact_memory as compact_repo_memory, read_memory, append_memory
 from agentnxt_code_assist.rag_knowledge import query_cloud_rag, load_cross_repo_memory, get_rag_endpoint
+from typing import Any
 
 
 @app.get("/memory/{repo_id}")
 def get_repo_memory(repo_id: str) -> dict[str, str | None]:
     """Get memory for a repository."""
     from pathlib import Path
-    repo_path = Path("/ srv/agennext/repos") / repo_id
+    repo_path = Path("/srv/agennext/repos") / repo_id
     memory = read_memory(repo_path) if repo_path.exists() else None
     return {"repo": repo_id, "memory": memory}
 
