@@ -185,3 +185,25 @@ Every bug is logged with:
 | `POST /improvements/bugs` | Log a new bug |
 | `POST /improvements/bugs/{id}/fix` | Mark bug fixed |
 | `POST /improvements/recommendations/{id}/implement` | Implement recommendation |
+
+## Process Excellence
+
+Tracks task completion times. If repeat task takes same or longer:
+
+1. **Analyze** - Calculate time savings potential
+2. **Suggest** - Propose improvements (caching, parallelization, skip logic)
+3. **User Approval** - User approves before implementation
+4. **Implement** - Apply approved improvements
+
+### API Endpoints
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /processes/statistics` | Task performance stats |
+| `GET /processes/tasks` | List tracked tasks |
+| `GET /processes/improvements` | Pending improvements |
+| `GET /processes/report` | Excellence report |
+| `POST /processes/tasks/start` | Start tracking |
+| `POST /processes/tasks/{id}/complete` | Complete task |
+| `POST /processes/improvements/{id}/approve` | Approve improvement |
+| `POST /processes/improvements/{id}/implement` | Implement improvement |

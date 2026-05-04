@@ -527,3 +527,95 @@ def implement_recommendation(recommendation_id: str, notes: str | None = None) -
     """Mark recommendation as implemented."""
     success = get_improver().implement_recommendation(recommendation_id, notes)
     return {"success": success}
+
+
+# === Process Excellence API ===
+
+from agentnxt_code_assist.process_excellence import (
+    ProcessExcellence,
+    get_excellence,
+    start_task,
+    complete_task,
+    TaskStatus,
+)
+
+
+@app.get("/processes/statistics")
+def process_statistics(task_name: str | None = None) -> dict:
+    """Get process statistics."""
+    return get_excellence().get_statistics(task_name)
+
+
+@app.get("/processes/tasks")
+def list_tasks(task_name: str | None = None, limit: int = 50) -> dict[str, list]:
+    """List recent tasks."""
+    return {"tasks": get_excellence().get_tasks(task_name, limit)}
+
+
+@app.get("/processes/improvements")
+def list_improvements() -> dict[str, list]:
+    """Get pending improvements."""
+    return {"improvements": get_excellence().get_pending_improvements()}
+
+
+@app.get("/processes/report")
+def process_report() -> str:
+    """Get process excellence report."""
+    return get_excellence().generate_report()
+
+
+class TaskInput(BaseModel):
+    task_name: str
+    context: dict = {}
+
+
+@app.post("/processes/tasks/start")
+def task_start(input: TaskInput) -> dict[str, str]:
+    """Start tracking a task."""
+    task_id = start_task(input.task_name, input.context)
+    return {"task_id": task_id, "status": "started"}
+
+
+class CompleteInput(BaseModel):
+    status: str = "completed"
+    duration_ms: int | None = None
+    error: str | None = None
+
+
+@app.post("/processes/tasks/{task_id}/complete")
+def task_complete(task_id: str, input: CompleteInput) -> dict[str, Any]:
+    """Complete a task."""
+    status = TaskStatus(input.status)
+    duration = complete_task(task_id, status, input.duration_ms, input.error)
+    return {"task_id": task_id, "duration_ms": duration}
+
+
+class ApproveInput(BaseModel):
+    approved: bool
+
+
+@app.post("/processes/improvements/{improvement_id}/approve")
+def approve_improvement(improvement_id: str, input: ApproveInput) -> dict[str, bool]:
+    """Approve an improvement."""
+    if input.approved:
+        success = get_excellence().approve_improvement(improvement_id)
+    else:
+        success = True
+    return {"success": success}
+
+
+class ImplementInput(BaseModel):
+    notes: str | None = None
+
+
+@app.post("/processes/improvements/{improvement_id}/implement")
+def implement_improvement_endpoint(
+    improvement_id: str,
+    input: ImplementInput
+) -> dict[str, bool]:
+    """Implement an approved improvement."""
+    success = get_excellence().implement_improvement(
+        improvement_id,
+        input.notes,
+    )
+    return {"success": success}
