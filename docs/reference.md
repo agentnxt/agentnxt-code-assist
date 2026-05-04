@@ -207,3 +207,26 @@ Tracks task completion times. If repeat task takes same or longer:
 | `POST /processes/tasks/{id}/complete` | Complete task |
 | `POST /processes/improvements/{id}/approve` | Approve improvement |
 | `POST /processes/improvements/{id}/implement` | Implement improvement |
+
+## Project Management
+
+Manages projects, tasks, milestones and dependencies.
+
+### API Endpoints
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /projects` | List projects |
+| `GET /projects/{id}` | Get project details |
+| `POST /projects` | Create project |
+| `PUT /projects/{id}` | Update project |
+| `DELETE /projects/{id}` | Delete project |
+| `POST /projects/{id}/tasks` | Add task |
+| `PUT /projects/{id}/tasks/{task_id}` | Update task |
+| `DELETE /projects/{id}/tasks/{task_id}` | Delete task |
+| `POST /projects/{id}/milestones` | Add milestone |
+| `POST /projects/{id}/milestones/{mid}/complete` | Complete milestone |
+| `POST /projects/{id}/dependencies` | Add dependency |
+| `GET /projects/{id}/tasks/{task_id}/blocked` | Get blocked tasks |
+| `GET /projects/statistics` | Project stats |
+| `GET /projects/report` | Project report |

@@ -619,3 +619,211 @@ def implement_improvement_endpoint(
         input.notes,
     )
     return {"success": success}
+
+
+# === Project Management API ===
+
+from agentnxt_code_assist.project_management import (
+    ProjectManager,
+    get_manager,
+    ProjectStatus,
+    TaskStatus,
+    Priority,
+)
+
+
+@app.get("/projects/statistics")
+def project_statistics(project_id: str | None = None) -> dict:
+    """Get project statistics."""
+    return get_manager().get_statistics(project_id)
+
+
+@app.get("/projects")
+def list_projects(status: str | None = None) -> dict[str, list]:
+    """List all projects."""
+    proj_status = None
+    if status:
+        try:
+            proj_status = ProjectStatus(status)
+        except ValueError:
+            pass
+    return {"projects": get_manager().list_projects(proj_status)}
+
+
+@app.get("/projects/{project_id}")
+def get_project(project_id: str) -> dict:
+    """Get project details."""
+    project = get_manager().get_project(project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    return project
+
+
+class ProjectInput(BaseModel):
+    name: str
+    description: str = ""
+    due_date: str | None = None
+
+
+@app.post("/projects")
+def create_project(input: ProjectInput) -> dict[str, str]:
+    """Create a new project."""
+    project_id = get_manager().create_project(input.name, input.description, input.due_date)
+    return {"project_id": project_id, "status": "created"}
+
+
+class UpdateProjectInput(BaseModel):
+    name: str | None = None
+    description: str | None = None
+    status: str | None = None
+    due_date: str | None = None
+
+
+@app.put("/projects/{project_id}")
+def update_project(project_id: str, input: UpdateProjectInput) -> dict[str, bool]:
+    """Update project."""
+    status = None
+    if input.status:
+        try:
+            status = ProjectStatus(input.status)
+        except ValueError:
+            pass
+    
+    success = get_manager().update_project(
+        project_id,
+        input.name,
+        input.description,
+        status,
+        input.due_date,
+    )
+    return {"success": success}
+
+
+@app.delete("/projects/{project_id}")
+def delete_project(project_id: str) -> dict[str, bool]:
+    """Delete project."""
+    success = get_manager().delete_project(project_id)
+    return {"success": success}
+
+
+class TaskInput(BaseModel):
+    name: str
+    description: str = ""
+    priority: str = "medium"
+    due_date: str | None = None
+
+
+@app.post("/projects/{project_id}/tasks")
+def add_task(project_id: str, input: TaskInput) -> dict[str, str]:
+    """Add task to project."""
+    try:
+        priority = Priority(input.priority)
+    except ValueError:
+        priority = Priority.MEDIUM
+    
+    task_id = get_manager().add_task(
+        project_id,
+        input.name,
+        input.description,
+        priority,
+        input.due_date,
+    )
+    return {"task_id": task_id, "status": "created"}
+
+
+class UpdateTaskInput(BaseModel):
+    name: str | None = None
+    description: str | None = None
+    status: str | None = None
+    priority: str | None = None
+    due_date: str | None = None
+
+
+@app.put("/projects/{project_id}/tasks/{task_id}")
+def update_task(project_id: str, task_id: str, input: UpdateTaskInput) -> dict[str, bool]:
+    """Update task."""
+    status = None
+    if input.status:
+        try:
+            status = TaskStatus(input.status)
+        except ValueError:
+            pass
+    
+    priority = None
+    if input.priority:
+        try:
+            priority = Priority(input.priority)
+        except ValueError:
+            pass
+    
+    success = get_manager().update_task(
+        project_id,
+        task_id,
+        status,
+        input.name,
+        input.description,
+        priority,
+        input.due_date,
+    )
+    return {"success": success}
+
+
+@app.delete("/projects/{project_id}/tasks/{task_id}")
+def delete_task(project_id: str, task_id: str) -> dict[str, bool]:
+    """Delete task."""
+    success = get_manager().delete_task(project_id, task_id)
+    return {"success": success}
+
+
+class MilestoneInput(BaseModel):
+    name: str
+    description: str = ""
+    due_date: str | None = None
+
+
+@app.post("/projects/{project_id}/milestones")
+def add_milestone(project_id: str, input: MilestoneInput) -> dict[str, str]:
+    """Add milestone to project."""
+    milestone_id = get_manager().add_milestone(
+        project_id,
+        input.name,
+        input.description,
+        input.due_date,
+    )
+    return {"milestone_id": milestone_id, "status": "created"}
+
+
+@app.post("/projects/{project_id}/milestones/{milestone_id}/complete")
+def complete_milestone(project_id: str, milestone_id: str) -> dict[str, bool]:
+    """Complete milestone."""
+    success = get_manager().complete_milestone(project_id, milestone_id)
+    return {"success": success}
+
+
+class DependencyInput(BaseModel):
+    from_task_id: str
+    to_task_id: str
+    dependency_type: str = "blocks"
+
+
+@app.post("/projects/{project_id}/dependencies")
+def add_dependency(project_id: str, input: DependencyInput) -> dict[str, str]:
+    """Add task dependency."""
+    dependency_id = get_manager().add_dependency(
+        input.from_task_id,
+        input.to_task_id,
+        input.dependency_type,
+    )
+    return {"dependency_id": dependency_id, "status": "created"}
+
+
+@app.get("/projects/{project_id}/tasks/{task_id}/blocked")
+def get_blocked_tasks(project_id: str, task_id: str) -> dict[str, list]:
+    """Get tasks blocked by given task."""
+    return {"tasks": get_manager().get_blocked_tasks(project_id, task_id)}
+
+
+@app.get("/projects/report")
+def project_report() -> str:
+    """Get project management report."""
+    return get_manager().generate_report()
