@@ -7,7 +7,7 @@ import urllib.error
 import urllib.request
 from dataclasses import dataclass
 
-from agentnxt_code_assist.schemas import AssistResult
+from agennext_codeassist.schemas import AssistResult
 
 
 @dataclass(frozen=True)

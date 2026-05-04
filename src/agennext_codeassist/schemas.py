@@ -6,7 +6,7 @@ from pathlib import Path
 
 from pydantic import BaseModel, Field, model_validator
 
-from agentnxt_code_assist.target_reference import parse_github_target_url
+from agennext_codeassist.target_reference import parse_github_target_url
 
 
 class CheckResult(BaseModel):

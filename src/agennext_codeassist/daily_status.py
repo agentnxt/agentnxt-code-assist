@@ -132,7 +132,7 @@ class DailyStatusReporter:
         
         # Get project status
         try:
-            from agentnxt_code_assist.project_management import get_manager
+            from agennext_codeassist.project_management import get_manager
             projects = get_manager().list_projects()
             
             on_track = []
@@ -162,7 +162,7 @@ class DailyStatusReporter:
         
         # Get bugs fixed
         try:
-            from agentnxt_code_assist.continuous_improvement import get_improver
+            from agennext_codeassist.continuous_improvement import get_improver
             bugs = get_improver().get_bugs(limit=100)
             bugs_fixed = len([b for b in bugs if b.get("date", "").startswith(today) and b.get("fix_applied")])
         except Exception:
@@ -170,7 +170,7 @@ class DailyStatusReporter:
         
         # Get improvements
         try:
-            from agentnxt_code_assist.process_excellence import get_excellence
+            from agennext_codeassist.process_excellence import get_excellence
             improvements = get_excellence().get_pending_improvements()
             improvements_made = len([i for i in improvements if i.get("implemented")])
         except Exception:

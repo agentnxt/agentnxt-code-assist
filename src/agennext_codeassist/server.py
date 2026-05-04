@@ -12,10 +12,10 @@ from fastapi.openapi.utils import get_openapi
 from starlette.middleware.base import BaseHTTPMiddleware
 import time
 
-from agentnxt_code_assist.aider_runner import AiderCodeAssist
-from agentnxt_code_assist.auth import Provider, get_available_models, parse_provider, get_provider_login_url
-from agentnxt_code_assist.config import Settings
-from agentnxt_code_assist.schemas import AssistRequest, AssistResult
+from agennext_codeassist.aider_runner import AiderCodeAssist
+from agennext_codeassist.auth import Provider, get_available_models, parse_provider, get_provider_login_url
+from agennext_codeassist.config import Settings
+from agennext_codeassist.schemas import AssistRequest, AssistResult
 
 # Production configuration
 PRODUCTION_MODE = os.environ.get("PRODUCTION", "false").lower() == "true"
@@ -275,7 +275,7 @@ def remove_provider(provider: str) -> AuthResponse:
 
 # === Local Model/Fallback API ===
 
-from agentnxt_code_assist.local_llm import (
+from agennext_codeassist.local_llm import (
     MODELS,
     download_model,
     get_fallback_instructions,
@@ -288,7 +288,7 @@ from agentnxt_code_assist.local_llm import (
 @app.get("/local/models")
 def list_local_models() -> dict[str, any]:
     """List available local models."""
-    from agentnxt_code_assist.local_llm import is_air_gapped
+    from agennext_codeassist.local_llm import is_air_gapped
     
     return {
         "installed": get_installed_models(),
@@ -328,8 +328,8 @@ def get_local_help() -> dict[str, str]:
 
 # === RAG/Memory API ===
 
-from agentnxt_code_assist.memory_store import compact_memory as compact_repo_memory, read_memory, append_memory
-from agentnxt_code_assist.rag_knowledge import query_cloud_rag, load_cross_repo_memory, get_rag_endpoint
+from agennext_codeassist.memory_store import compact_memory as compact_repo_memory, read_memory, append_memory
+from agennext_codeassist.rag_knowledge import query_cloud_rag, load_cross_repo_memory, get_rag_endpoint
 from typing import Any
 
 
@@ -346,7 +346,7 @@ def get_repo_memory(repo_id: str) -> dict[str, str | None]:
 def add_to_memory(repo_id: str, result: dict[str, Any]) -> dict[str, str]:
     """Append to repository memory."""
     from pathlib import Path
-    from agentnxt_code_assist.schemas import AssistResult
+    from agennext_codeassist.schemas import AssistResult
     repo_path = Path("/srv/agennext/repos") / repo_id
     if not repo_path.exists():
         raise HTTPException(status_code=404, detail="Repository not found")
@@ -435,7 +435,7 @@ async def openapi():
 
 # === Continuous Improvement API ===
 
-from agentnxt_code_assist.continuous_improvement import (
+from agennext_codeassist.continuous_improvement import (
     BugCategory,
     BugSeverity,
     get_improver,
@@ -531,7 +531,7 @@ def implement_recommendation(recommendation_id: str, notes: str | None = None) -
 
 # === Process Excellence API ===
 
-from agentnxt_code_assist.process_excellence import (
+from agennext_codeassist.process_excellence import (
     ProcessExcellence,
     get_excellence,
     start_task,
@@ -623,7 +623,7 @@ def implement_improvement_endpoint(
 
 # === Project Management API ===
 
-from agentnxt_code_assist.project_management import (
+from agennext_codeassist.project_management import (
     ProjectManager,
     get_manager,
     ProjectStatus,
@@ -831,7 +831,7 @@ def project_report() -> str:
 
 # === Daily Status API ===
 
-from agentnxt_code_assist.daily_status import (
+from agennext_codeassist.daily_status import (
     DailyStatusReporter,
     get_reporter,
 )
@@ -907,7 +907,7 @@ def resolve_blocker(blocker_id: str) -> dict[str, bool]:
 
 # === Jira Integration API ===
 
-from agentnxt_code_assist.jira_integration import (
+from agennext_codeassist.jira_integration import (
     JiraIntegration,
     get_jira,
     JiraIssueType,

@@ -19,7 +19,7 @@ from uuid import uuid4
 import json
 
 # Local imports (after defining data classes for forward refs)
-from agentnxt_code_assist.context_aware import AgentContext, SessionContext
+from agennext_codeassist.context_aware import AgentContext, SessionContext
 
 
 @dataclass
@@ -209,7 +209,7 @@ def log_decision(
     Adds to the decision log file and creates individual ADR files.
     """
     import os
-    from agentnxt_code_assist.schemas import AssistResult
+    from agennext_codeassist.schemas import AssistResult
     
     log_path = (repo_path / relative_path).resolve()
     if not log_path.is_relative_to(repo_path.resolve()):
@@ -533,7 +533,7 @@ class DecisionLogger:
         if not self.ctx:
             return True, "OK"
         
-        from agentnxt_code_assist.context_aware import check_constraints
+        from agennext_codeassist.context_aware import check_constraints
         import re
         
         # Extract file paths

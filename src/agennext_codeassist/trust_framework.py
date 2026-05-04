@@ -106,7 +106,7 @@ USAGE:
 ======
 
 ```python
-from agentnxt_code_assist.heart_of_saying_yes import get_heart
+from agennext_codeassist.heart_of_saying_yes import get_heart
 
 # Trust-building responses
 heart = get_heart()

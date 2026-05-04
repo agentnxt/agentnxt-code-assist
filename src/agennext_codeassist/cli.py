@@ -7,11 +7,11 @@ from pathlib import Path
 
 import uvicorn
 
-from agentnxt_code_assist.aider_runner import AiderCodeAssist
-from agentnxt_code_assist.config import Settings
-from agentnxt_code_assist.local_llm import download_model, get_fallback_instructions, get_installed_models, MODELS
-from agentnxt_code_assist.ports import find_available_port
-from agentnxt_code_assist.schemas import AssistRequest
+from agennext_codeassist.aider_runner import AiderCodeAssist
+from agennext_codeassist.config import Settings
+from agennext_codeassist.local_llm import download_model, get_fallback_instructions, get_installed_models, MODELS
+from agennext_codeassist.ports import find_available_port
+from agennext_codeassist.schemas import AssistRequest
 
 
 def build_parser() -> argparse.ArgumentParser:

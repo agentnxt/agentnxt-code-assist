@@ -420,7 +420,7 @@ def auto_improve_skills(
     
     Returns: list of skill names that were improved/replaced
     """
-    from agentnxt_code_assist.skill_registry import SkillPriority
+    from agennext_codeassist.skill_registry import SkillPriority
     
     engine = SelfImprovementEngine(metrics_path)
     improvements = []
@@ -565,7 +565,7 @@ def record_execution_and_learn(
     
     # Also trigger notifications if significant
     if not result.success and result.errors:
-        from agentnxt_code_assist.notifications import notify
+        from agennext_codeassist.notifications import notify
         notify(
             "⚠️ Execution Failed",
             f"Errors: {'; '.join(result.errors[:2])}",
@@ -699,8 +699,8 @@ class SelfImprovementLoop:
         
         # Run auto-improvement
         try:
-            from agentnxt_code_assist.skill_registry import get_skills_registry
-            from agentnxt_code_assist.tool_registry import get_registry
+            from agennext_codeassist.skill_registry import get_skills_registry
+            from agennext_codeassist.tool_registry import get_registry
             
             auto_improve_all(
                 skills_registry=get_skills_registry(),

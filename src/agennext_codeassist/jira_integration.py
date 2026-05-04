@@ -305,7 +305,7 @@ class JiraIntegration:
     
     def sync_from_jira(self, project_id: str) -> dict[str, Any]:
         """Sync tasks from Jira to local project."""
-        from agentnxt_code_assist.project_management import get_manager
+        from agennext_codeassist.project_management import get_manager
         
         issues = self.search_issues()
         results = {"created": 0, "updated": 0, "errors": []}
@@ -351,7 +351,7 @@ class JiraIntegration:
             
             if task_id:
                 # Update status
-                from agentnxt_code_assist.project_management import TaskStatus
+                from agennext_codeassist.project_management import TaskStatus
                 get_manager().update_task(project_id, task_id, TaskStatus(status))
                 
                 # Save mapping

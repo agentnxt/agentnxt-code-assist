@@ -9,7 +9,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from pathlib import Path
 
-from agentnxt_code_assist.schemas import AssistResult
+from agennext_codeassist.schemas import AssistResult
 
 _DEFAULT_MEMORY_PATH = ".agennext/memory.md"
 _SECRET_MARKERS = (

@@ -13,13 +13,13 @@ from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
 
-from agentnxt_code_assist.change_log import append_change_log, build_change_log
-from agentnxt_code_assist.check_planner import planned_checks
-from agentnxt_code_assist.config import Settings
-from agentnxt_code_assist.context_fetcher import fetch_target_context
-from agentnxt_code_assist.dependency_audit import audit_dependencies
-from agentnxt_code_assist.email_notifier import notify_email
-from agentnxt_code_assist.git_workspace import (
+from agennext_codeassist.change_log import append_change_log, build_change_log
+from agennext_codeassist.check_planner import planned_checks
+from agennext_codeassist.config import Settings
+from agennext_codeassist.context_fetcher import fetch_target_context
+from agennext_codeassist.dependency_audit import audit_dependencies
+from agennext_codeassist.email_notifier import notify_email
+from agennext_codeassist.git_workspace import (
     changed_files as git_changed_files,
     checkout_base_branch,
     configure_git_identity,
@@ -28,15 +28,15 @@ from agentnxt_code_assist.git_workspace import (
     get_current_sha,
     push_branch,
 )
-from agentnxt_code_assist.memory_store import append_memory, memory_prompt_block, read_memory
-from agentnxt_code_assist.rag_knowledge import load_rag_context
-from agentnxt_code_assist.runner_client import RunnerClient
-from agentnxt_code_assist.audit_trace import write_audit_trace
-from agentnxt_code_assist.repo_audit import audit_repo
-from agentnxt_code_assist.schemas import AssistRequest, AssistResult, CheckResult, NotificationResult, RepoAnomalyResult
-from agentnxt_code_assist.skill_registry import skill_prompt_block
-from agentnxt_code_assist.slack_notifier import notify_slack
-from agentnxt_code_assist.webhook_notifier import notify_webhook
+from agennext_codeassist.memory_store import append_memory, memory_prompt_block, read_memory
+from agennext_codeassist.rag_knowledge import load_rag_context
+from agennext_codeassist.runner_client import RunnerClient
+from agennext_codeassist.audit_trace import write_audit_trace
+from agennext_codeassist.repo_audit import audit_repo
+from agennext_codeassist.schemas import AssistRequest, AssistResult, CheckResult, NotificationResult, RepoAnomalyResult
+from agennext_codeassist.skill_registry import skill_prompt_block
+from agennext_codeassist.slack_notifier import notify_slack
+from agennext_codeassist.webhook_notifier import notify_webhook
 
 
 _SEVERITY_RANK = {"info": 1, "warning": 2, "error": 3}
