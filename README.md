@@ -1,6 +1,6 @@
-# AGenNext Code Assist
+# AGenNext CodeAssist
 
-AGenNext Code Assist is a small service, CLI, and optional web UI that wraps Aider's Python scripting API for focused code changes inside a target repository.
+AGenNext CodeAssist is a small service, CLI, and optional web UI that wraps Aider's Python scripting API for focused code changes inside a target repository.
 
 It can:
 
@@ -58,7 +58,7 @@ The Aider Python scripting API is documented by Aider as useful but not a stable
 | Optional edge | `docker compose --profile edge up -d` | Caddy reverse proxy and automatic HTTPS |
 | Optional ops stack | `docker compose --profile ops up -d` | Uptime, error tracking, observability, and secrets services |
 | Cloud Run | GitHub Actions workflow | Managed backend deployment |
-| GHCR/Docker Hub | CI/CD after approval | Publishable image targets, not pushed by Code Assist |
+| GHCR/Docker Hub | CI/CD after approval | Publishable image targets, not pushed by CodeAssist |
 
 Primary CLI:
 
@@ -88,7 +88,7 @@ AGENTNXT_CODE_ASSIST_*
 
 ## Safety defaults
 
-Code Assist is local-first and review-first.
+CodeAssist is local-first and review-first.
 
 By default it does **not**:
 
@@ -110,7 +110,7 @@ Explicit authorization is required:
 --notify-smtp
 ```
 
-Merge is not supported by Code Assist. Merge must happen outside this tool after human approval.
+Merge is not supported by CodeAssist. Merge must happen outside this tool after human approval.
 
 ---
 
@@ -130,7 +130,7 @@ Set the provider API key in `.env`, then run a task.
 
 ## Docker Desktop production simulation
 
-Use this when you want to test AGenNext Code Assist locally in containers before deploying.
+Use this when you want to test AGenNext CodeAssist locally in containers before deploying.
 
 The simulation script:
 
@@ -210,7 +210,7 @@ Use `--dry-run` to ask Aider for the patch without writing files:
 
 ## Managed checkout mode
 
-Use this when Code Assist should clone/fetch the target repo itself.
+Use this when CodeAssist should clone/fetch the target repo itself.
 
 ```bash
 .venv/bin/agennext-code-assist run \
