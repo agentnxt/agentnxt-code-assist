@@ -76,6 +76,19 @@ ALLOWED_ORIGINS=https://your-domain.com
 
 ## Deployment Modes
 
+### Docker Compose Profiles
+
+| Profile | Services | Command |
+|---------|----------|---------|
+| Default | Backend API | `docker compose up -d` |
+| web | Backend + Next.js UI | `docker compose --profile web up -d` |
+| edge | + Caddy HTTPS proxy | `docker compose --profile edge up -d` |
+| ops | + Full ops stack | `docker compose --profile ops up -d` |
+| uptime | Monitoring | `docker compose --profile uptime up -d` |
+| errors | Error tracking | `docker compose --profile errors up -d` |
+| observability | SigNoz | `docker compose --profile observability up -d` |
+| secrets | Infisical | `docker compose --profile secrets up -d` |
+
 ### 1. Python CLI
 ```bash
 pip install -e .
@@ -129,3 +142,26 @@ pip install pip-audit && pip-audit
 
 - GitHub Issues: https://github.com/AGenNext/CodeAssist/issues
 - Discussions: https://github.com/AGenNext/CodeAssist/discussions
+
+## Built-in Tools
+
+| Tool | Purpose | Enable Flag |
+|------|---------|------------|
+| Travel | TripAdvisor-style discovery | `enable_travel_tools` |
+| Weather | Real-time weather | `enable_weather_tools` |
+| Map | Location services | `enable_map_tools` |
+| News | Current news | `enable_news_tools` |
+| User Profile | Personalized interactions | `enable_user_profile` |
+| Skill Registry | Dynamic skill registration | `enable_skill_registry` |
+| RAG Knowledge | Retrieval-augmented generation | `enable_rag_knowledge` |
+
+## Built-in Skills
+
+| Skill | Purpose |
+|-------|---------|
+| Empathy | Emotional state adaptation |
+| Self-Respect | Boundary maintenance |
+| Trust Building | Transparency and reliability |
+| Situation Awareness | Context monitoring |
+| Self-Improvement | Continuous learning |
+| Decision Logging | Execution reasoning |
