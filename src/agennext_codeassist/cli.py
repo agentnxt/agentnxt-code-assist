@@ -189,7 +189,7 @@ def serve_command(args: argparse.Namespace, settings: Settings) -> int:
     if port != preferred_port:
         print(f"Preferred port {preferred_port} is unavailable; using {port}.")
     print(f"AGenNext Code Assist API listening on http://{host}:{port}")
-    uvicorn.run("agentnxt_code_assist.server:app", host=host, port=port, reload=False)
+    uvicorn.run("agennext_codeassist.server:app", host=host, port=port, reload=False)
     return 0
 
 

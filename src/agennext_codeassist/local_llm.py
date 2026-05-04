@@ -166,7 +166,7 @@ def get_fallback_instructions() -> str:
    sudo apt install llama.cpp
 
 2. Download a model:
-   python -m agentnxt_code_assist download-model llama3-8b
+   python -m agennext_codeassist download-model llama3-8b
 
 3. The app will automatically use the local model when APIs are rate-limited."""
 

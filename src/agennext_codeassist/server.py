@@ -88,7 +88,7 @@ async def add_security_headers(request: Request, call_next):
 assistant = AiderCodeAssist()
 settings = Settings.from_env()
 API_BASE = os.environ.get("AGENNEXT_CODE_ASSIST_API_URL", f"http://{settings.host}:{settings.port}")
-static_dir = files("agentnxt_code_assist").joinpath("static")
+static_dir = files("agennext_codeassist").joinpath("static")
 app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
 
 
