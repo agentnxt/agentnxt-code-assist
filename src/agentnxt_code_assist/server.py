@@ -6,8 +6,9 @@ from typing import Any, Callable
 
 from fastapi import FastAPI, HTTPException, Request, Response, status
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
+from fastapi.openapi.utils import get_openapi
 from starlette.middleware.base import BaseHTTPMiddleware
 import time
 
@@ -383,3 +384,50 @@ def search_rag(query: dict[str, str | int | None]) -> dict[str, list[str]]:
 def get_rag_config() -> dict[str, str | None]:
     """Get configured RAG endpoint."""
     return {"endpoint": get_rag_endpoint()}
+
+
+# === API Documentation ===
+
+@app.get("/docs", include_in_schema=False)
+async def redundant_docs():
+    """Redirect to /redoc for API documentation."""
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse(url="/redoc")
+
+
+@app.get("/redoc", include_in_schema=False)
+async def redoc_html():
+    """ReDoc API documentation."""
+    return HTMLResponse(
+        content="""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>AGenNext CodeAssist API</title>
+            <meta name="viewport" content="width=device-width, initial-scale=1">
+            <link href="https://fonts.googleapis.com/css?family=Montserrat:400,700|ROBOTO:300,400,700|INCONSOLATA:400,700" rel="stylesheet" type="text/css" />
+            <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/redoc@next/bundles/redoc.standalone.js" />
+            <style>
+                body { margin: 0; padding: 0; }
+            </style>
+        </head>
+        <body>
+            <redoc spec-url='/openapi.json'></redoc>
+            <script src="https://cdn.jsdelivr.net/npm/redoc@next/bundles/redoc.standalone.js"></script>
+        </body>
+        </html>
+        """,
+        media_type="text/html"
+    )
+
+
+@app.get("/openapi.json", include_in_schema=False)
+async def openapi():
+    """Get OpenAPI schema."""
+    schema = get_openapi(
+        title="AGenNext CodeAssist API",
+        version="0.1.0",
+        description="API for AGenNext CodeAssist - AI Coding Assistant",
+        routes=app.routes,
+    )
+    return schema
