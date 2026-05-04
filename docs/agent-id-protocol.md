@@ -1,6 +1,6 @@
 # Generic OIDC Agent ID Protocol support
 
-AGenNext CodeAssist supports a provider-neutral Agent ID Protocol integration.
+AGenNext Code Assist supports a provider-neutral Agent ID Protocol integration.
 
 The integration is intentionally separate from login and authorization:
 
@@ -8,7 +8,7 @@ The integration is intentionally separate from login and authorization:
 OIDC                 -> authenticates the user/operator
 Agent ID Protocol    -> enriches runs with agent DID, delegation, governance, and binding metadata
 AuthZEN/OpenFGA/OPA  -> authorizes and evaluates policy decisions
-CodeAssist          -> enforces decisions and records context
+Code Assist          -> enforces decisions and records context
 ```
 
 Any Agent ID-compatible registry/control plane can be used. The registry should expose Agent ID records over HTTP.
@@ -79,7 +79,7 @@ The adapter supports the Agent ID Protocol style envelope:
 agent_id_protocol_version: "0.2.0"
 agent:
   did: did:web:example.com:agents:code-assist
-  display_name: AGenNext CodeAssist
+  display_name: AGenNext Code Assist
   owner: AGenNext
   role: code-assist
   environment: production
@@ -124,9 +124,9 @@ The client also accepts wrapped responses such as:
 { "data": { } }
 ```
 
-## What CodeAssist should use from Agent ID
+## What Code Assist should use from Agent ID
 
-CodeAssist should consume Agent ID context for:
+Code Assist should consume Agent ID context for:
 
 ```text
 agent DID
@@ -158,16 +158,16 @@ AuthZEN authorization decisions
 OpenFGA/ReBAC relationship checks
 OPA policy decisions
 security/vulnerability gates
-CodeAssist local guardrails
+Code Assist local guardrails
 ```
 
 ## Recommended combined flow
 
 ```text
 1. Authenticate operator through OIDC.
-2. Resolve optional Agent ID context for the CodeAssist agent.
+2. Resolve optional Agent ID context for the Code Assist agent.
 3. Send subject + action + resource + Agent ID context to AuthZEN-compatible authorization backend.
-4. Run CodeAssist only if authorization and local guardrails allow.
+4. Run Code Assist only if authorization and local guardrails allow.
 5. Record Agent ID context in audit/change logs when safe.
 ```
 

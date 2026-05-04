@@ -1,6 +1,6 @@
-# AGenNext CodeAssist
+# AGenNext Code Assist
 
-AGenNext CodeAssist is a small service, CLI, and optional web UI that wraps Aider's Python scripting API for focused code changes inside a target repository.
+AGenNext Code Assist is a small service, CLI, and optional web UI that wraps Aider's Python scripting API for focused code changes inside a target repository.
 
 It can:
 
@@ -19,25 +19,6 @@ It can:
 - provide an optional Next.js chat UI for operators
 - run a Docker Desktop production-simulation stack locally
 - support dry runs, automatic confirmations, optional Aider auto-commits, and optional branch push
-
-### Advanced Agent Capabilities
-
-- **Empathy System**: Understands user emotions and adapts communication style based on emotional state, frustration/satisfaction signals, and help-seeking behavior
-- **Self-Respect Framework**: Maintains agent autonomy and healthy boundaries in interactions
-- **Trust Building Framework**: Establishes and maintains trust through consistent action and transparency
-- **Situation Awareness**: Real-time context monitoring and environmental awareness
-- **Self-Improvement Engine**: Continuous learning and skill enhancement based on execution feedback
-- **Decision Logging**: Structured logging of task execution decisions and reasoning
-
-### Tool Ecosystem
-
-- **Travel Tools**: TripAdvisor-style travel discovery with destination research, itinerary planning, and travel recommendations
-- **Weather Tool**: Real-time weather information for planning and logistics
-- **Map Tool**: Location-based services and geographic context
-- **News Tool**: Current news and information retrieval
-- **User Profile**: Personalized interactions based on user preferences and history
-- **Skill Registry**: Dynamic skill and tool registration with fallback mechanisms
-- **RAG Knowledge**: Retrieval-augmented generation for knowledge-based queries
 
 The Aider Python scripting API is documented by Aider as useful but not a stable compatibility contract, so the wrapper keeps Aider usage isolated in one module.
 
@@ -58,7 +39,7 @@ The Aider Python scripting API is documented by Aider as useful but not a stable
 | Optional edge | `docker compose --profile edge up -d` | Caddy reverse proxy and automatic HTTPS |
 | Optional ops stack | `docker compose --profile ops up -d` | Uptime, error tracking, observability, and secrets services |
 | Cloud Run | GitHub Actions workflow | Managed backend deployment |
-| GHCR/Docker Hub | CI/CD after approval | Publishable image targets, not pushed by CodeAssist |
+| GHCR/Docker Hub | CI/CD after approval | Publishable image targets, not pushed by Code Assist |
 
 Primary CLI:
 
@@ -88,7 +69,7 @@ AGENTNXT_CODE_ASSIST_*
 
 ## Safety defaults
 
-CodeAssist is local-first and review-first.
+Code Assist is local-first and review-first.
 
 By default it does **not**:
 
@@ -110,7 +91,7 @@ Explicit authorization is required:
 --notify-smtp
 ```
 
-Merge is not supported by CodeAssist. Merge must happen outside this tool after human approval.
+Merge is not supported by Code Assist. Merge must happen outside this tool after human approval.
 
 ---
 
@@ -130,7 +111,7 @@ Set the provider API key in `.env`, then run a task.
 
 ## Docker Desktop production simulation
 
-Use this when you want to test AGenNext CodeAssist locally in containers before deploying.
+Use this when you want to test AGenNext Code Assist locally in containers before deploying.
 
 The simulation script:
 
@@ -210,7 +191,7 @@ Use `--dry-run` to ask Aider for the patch without writing files:
 
 ## Managed checkout mode
 
-Use this when CodeAssist should clone/fetch the target repo itself.
+Use this when Code Assist should clone/fetch the target repo itself.
 
 ```bash
 .venv/bin/agennext-code-assist run \
@@ -601,7 +582,7 @@ Legacy `AGENTNXT_CODE_ASSIST_*` variables are still accepted as compatibility fa
 ## Python usage
 
 ```python
-from agennext_codeassist import AiderCodeAssist, AssistRequest
+from agentnxt_code_assist import AiderCodeAssist, AssistRequest
 
 assistant = AiderCodeAssist()
 result = assistant.run(
@@ -695,113 +676,3 @@ The test configuration is in `web/playwright.config.ts` and includes:
 - Chromium, Firefox, and WebKit browser testing
 - HTML test reporting
 - Automatic server startup during tests
-
----
-
-## Advanced Modules
-
-### Continuous Improvement System
-
-Track bugs, analyze root causes, and generate improvement recommendations.
-
-```python
-from agennext_codeassist.continuous_improvement import get_improver
-
-improver = get_improver()
-improver.log_bug(
-    exception_type="ValueError",
-    context={"file": "auth.py", "function": "validate_token"},
-    severity="high"
-)
-```
-
-**API Endpoints:**
-- `POST /improvements/bugs` - Log a bug
-- `GET /improvements/bugs` - List bugs
-- `GET /improvements/recommendations` - Get improvements
-- `POST /improvements/bugs/{id}/fix` - Mark fixed
-
-### Process Excellence
-
-Track task timing and auto-suggest improvements for repeat tasks.
-
-```python
-from agennext_codeassist.process_excellence import start_task, complete_task
-
-task_id = start_task("encode_video", {"format": "mp4"})
-# ... do work ...
-duration = complete_task(task_id)
-```
-
-If a repeat task takes same/longer time, the system analyzes and suggests:
-- Caching
-- Parallelization
-- Skip logic
-
-**API Endpoints:**
-- `POST /processes/tasks/start` - Start tracking
-- `POST /processes/tasks/{id}/complete` - Complete & analyze
-- `GET /processes/improvements` - Pending improvements
-- `POST /processes/improvements/{id}/approve` - Approve improvement
-
-### Project Management
-
-Manage projects, tasks, milestones, and dependencies.
-
-```python
-from agennext_codeassist.project_management import get_manager
-
-manager = get_manager()
-project_id = manager.create_project("New Feature", "Description")
-task_id = manager.add_task(project_id, "Implement login", priority="high")
-manager.add_dependency(task_id, db_task_id, "blocks")
-```
-
-**API Endpoints:**
-- `POST /projects` - Create project
-- `POST /projects/{id}/tasks` - Add task
-- `POST /projects/{id}/milestones` - Add milestone
-- `POST /projects/{id}/dependencies` - Add dependency
-
-### Daily Status Reports
-
-End-of-day reports with email and Slack notifications.
-
-```python
-from agennext_codeassist.daily_status import get_reporter
-
-reporter = get_reporter()
-reporter.add_completed_task("Added login", "OAuth flow")
-reporter.add_plan("Add logout", "high")
-reporter.add_blocker("API rate limit", "medium")
-reporter.send_all()  # Email + Slack
-```
-
-**Environment:**
-- `AGENNEXT_CODE_ASSIST_SMTP_URL`
-- `AGENNEXT_CODE_ASSIST_SMTP_FROM_EMAIL`
-- `AGENNEXT_CODE_ASSIST_SMTP_TO_EMAIL`
-- `SLACK_WEBHOOK_URL`
-
-### Jira Integration
-
-Sync with Jira issues and projects.
-
-```python
-from agennext_codeassist.jira_integration import get_jira
-
-jira = get_jira()
-jira.create_issue("Fix login bug", "Priority: High", JiraPriority.HIGH)
-jira.sync_to_jira(project_id)
-```
-
-**Environment:**
-- `JIRA_URL`
-- `JIRA_EMAIL`
-- `JIRA_API_TOKEN`
-- `JIRA_PROJECT_KEY`
-
-**API Endpoints:**
-- `POST /jira/issues` - Create issue
-- `POST /jira/sync/{project_id}/to` - Sync to Jira
-- `POST /jira/sync/{project_id}/from` - Sync from Jira
