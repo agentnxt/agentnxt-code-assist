@@ -24,6 +24,10 @@
         <a href="#testing">Testing</a>
         <a href="#architecture">Architecture</a>
         <a href="#roadmap">Roadmap</a>
+        <a href="http://vps.openautonomyx.com:8090">API</a>
+        <a href="http://vps.openautonomyx.com:8090/docs">Docs</a>
+        <a href="http://vps.openautonomyx.com:3000">Projects</a>
+        <a href="http://vps.openautonomyx.com:3000/daily">Daily</a>
         <a class="nav-cta" href="https://github.com/AGenNext/Code-Assist">GitHub</a>
       </nav>
     </header>
@@ -40,6 +44,7 @@
           <div class="actions">
             <a class="button primary" href="#quickstart">Get started</a>
             <a class="button secondary" href="https://github.com/AGenNext/Code-Assist/pulls">View PRs</a>
+            <a class="button secondary" href="http://vps.openautonomyx.com:8090">Live Demo</a>
           </div>
         </div>
         <div class="terminal-card" aria-label="Example command">
@@ -113,14 +118,21 @@
       <section id="quickstart" class="section split">
         <div>
           <p class="eyebrow">Quickstart</p>
-          <h2>Run locally or in Docker Desktop</h2>
+          <h2>Run locally, in Docker, or use the live API</h2>
           <p>
-            Start with the Python CLI, run the FastAPI backend, or launch the local production simulation with Docker Desktop.
+            Use the hosted API running on the VPS, run locally with Python CLI, or launch with Docker Desktop.
           </p>
         </div>
         <div class="code-stack">
-          <pre><code>git clone https://github.com/AGenNext/Code-Assist.git
-cd Code-Assist
+          <p class="caption">Live hosted API (port 8090)</p>
+          <pre><code># FastAPI running at:
+http://vps.openautonomyx.com:8090
+
+# OpenAPI schema:
+curl http://vps.openautonomyx.com:8090/openapi.json</code></pre>
+          <p class="caption">Local install</p>
+          <pre><code>git clone https://github.com/AGenNext/CodeAssist.git
+cd CodeAssist
 python3.12 -m venv .venv
 .venv/bin/pip install -e .
 cp .env.example .env</code></pre>
