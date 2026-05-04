@@ -20,6 +20,25 @@ It can:
 - run a Docker Desktop production-simulation stack locally
 - support dry runs, automatic confirmations, optional Aider auto-commits, and optional branch push
 
+### Advanced Agent Capabilities
+
+- **Empathy System**: Understands user emotions and adapts communication style based on emotional state, frustration/satisfaction signals, and help-seeking behavior
+- **Self-Respect Framework**: Maintains agent autonomy and healthy boundaries in interactions
+- **Trust Building Framework**: Establishes and maintains trust through consistent action and transparency
+- **Situation Awareness**: Real-time context monitoring and environmental awareness
+- **Self-Improvement Engine**: Continuous learning and skill enhancement based on execution feedback
+- **Decision Logging**: Structured logging of task execution decisions and reasoning
+
+### Tool Ecosystem
+
+- **Travel Tools**: TripAdvisor-style travel discovery with destination research, itinerary planning, and travel recommendations
+- **Weather Tool**: Real-time weather information for planning and logistics
+- **Map Tool**: Location-based services and geographic context
+- **News Tool**: Current news and information retrieval
+- **User Profile**: Personalized interactions based on user preferences and history
+- **Skill Registry**: Dynamic skill and tool registration with fallback mechanisms
+- **RAG Knowledge**: Retrieval-augmented generation for knowledge-based queries
+
 The Aider Python scripting API is documented by Aider as useful but not a stable compatibility contract, so the wrapper keeps Aider usage isolated in one module.
 
 ---
