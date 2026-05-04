@@ -10,9 +10,8 @@
   reverse_proxy @api agennext-code-assist:8090
 
   handle /codeassist/* {
-    file_server {
-      root /srv/agennext/code-assist/site
-    }
+    root * /srv/agennext/code-assist/site
+    file_server
   }
 
   reverse_proxy agennext-code-assist-web:3000

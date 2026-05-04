@@ -56,6 +56,7 @@ services:
       - CADDY_ACME_EMAIL=${CADDY_ACME_EMAIL:-admin@example.com}
     volumes:
       - ./deploy/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./site:/srv/agennext/code-assist/site:ro
       - caddy_data:/data
       - caddy_config:/config
     restart: unless-stopped
