@@ -44,9 +44,6 @@ services:
     image: caddy:2-alpine
     profiles:
       - edge
-    depends_on:
-      - agennext-code-assist
-      - agennext-code-assist-web
     ports:
       - "80:80"
       - "443:443"
