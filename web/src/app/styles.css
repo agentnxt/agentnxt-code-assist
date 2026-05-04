@@ -35,10 +35,43 @@ textarea {
 
 .hero {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 320px;
+  grid-template-columns: 1fr 1fr 1fr 1fr;
   gap: 24px;
   align-items: end;
   margin-bottom: 24px;
+  width: 100%;
+}
+
+.modules-nav {
+  display: contents;
+}
+
+.module-link {
+  display: flex;
+  flex-direction: column;
+  padding: 16px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  text-decoration: none;
+  transition: all 0.2s ease;
+}
+
+.module-link:hover {
+  background: var(--panel-2);
+  border-color: var(--accent);
+  transform: translateY(-2px);
+}
+
+.module-label {
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+
+.module-desc {
+  color: var(--muted);
+  font-size: 0.8rem;
+  margin-top: 4px;
 }
 
 .eyebrow {

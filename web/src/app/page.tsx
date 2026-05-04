@@ -4,6 +4,14 @@ import { FormEvent, useMemo, useState, useEffect } from 'react';
 import { runAssist, listProviders, getProvider, loginWithProvider, listLocalModels } from '../lib/api';
 import type { AssistResult, AuthResponse } from '../lib/types';
 
+// Quick links to new modules
+const MODULE_LINKS = [
+  { label: 'Projects', href: '/projects', desc: 'Manage tasks & milestones' },
+  { label: 'Daily Status', href: '/daily/summary', desc: 'Status reports' },
+  { label: 'Jira', href: '/jira/issues', desc: 'Issue sync' },
+  { label: 'Improvements', href: '/improvements/report', desc: 'Bug tracking' },
+];
+
 const CHECK_PRESETS = [
   'production',
   'dependency',
@@ -182,6 +190,14 @@ export default function HomePage() {
             overrides. Commit, push, and PR actions still require explicit authorization.
           </p>
         </div>
+        <nav className="modules-nav">
+          {MODULE_LINKS.map((mod) => (
+            <a key={mod.href} href={mod.href} className="module-link">
+              <span className="module-label">{mod.label}</span>
+              <span className="module-desc">{mod.desc}</span>
+            </a>
+          ))}
+        </nav>
         <div className="status-card">
           <span>Backend</span>
           <strong>{process.env.NEXT_PUBLIC_AGENNEXT_CODE_ASSIST_API_URL || 'http://localhost:8090'}</strong>
