@@ -1,0 +1,154 @@
+name: Security Vulnerability Scanning
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: '0 0 * * 0'  # Weekly scan
+  pull_request:
+
+jobs:
+  # Static Application Security Testing (SAST)
+  sast:
+    name: SAST Scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run Bandit security scanner
+        run: |
+          pip install bandit
+          bandit -r src/ -f json -o bandit-report.json || true
+      - name: Upload Bandit report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bandit-report
+          path: bandit-report.json
+
+      - name: Run Semgrep scan
+        run: |
+          docker run -rm --workdir /src -v $(pwd):/src returntocorp/semgrep:latest semgrep --config auto --json --output semgrep-report.json || true
+      - name: Upload Semgrep report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: semgrep-report
+          path: semgrep-report.json
+
+  # Secret scanning
+  secrets:
+    name: Secret Scanning
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Scan for secrets
+        uses: trufflesecurity/trufflehog@main
+        with:
+          repository: ${{ github.repository }}
+          base: ${{ github.event.pull_request.base_ref || 'main' }}
+          head: ${{ github.event.pull_request.head.ref || 'HEAD' }}
+          extra_args: --json
+
+  # Dependency vulnerability scanning
+  dependencies:
+    name: Dependency Vulnerabilities
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Check for vulnerabilities
+        run: |
+          pip install pip-audit
+          pip-audit -r requirements.txt || pip-audit -r pyproject.toml || true
+
+      - name: Run safety check
+        run: |
+          pip install safety
+          safety check --json || true
+
+  # Docker security scan
+  docker:
+    name: Docker Security
+    runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker image
+        run: |
+          docker build -t codeassist:${{ github.sha }} .
+
+      - name: Run Trivy scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          image: 'codeassist:${{ github.sha }}'
+          format: json
+          output: trivy-report.json
+      - name: Upload Trivy report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: trivy-report
+          path: trivy-report.json
+
+  # GitHub Dependabot integration
+  dependabot:
+    name: Dependabot Alerts
+    runs-on: ubuntu-latest
+    outputs:
+      vuln: ${{ steps.check.outputs.vuln }}
+    steps:
+      - name: Check for vulnerabilities
+        id: check
+        run: |
+          echo "Checking for GitHub Advisory Database alerts..."
+          curl -s -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            "https://api.github.com/repos/${{ github.repository }}/dependabot/alerts" | \
+            jq -r '.[].security_advisory // empty' | head -1
+          if [ -n "$(curl -s -H 'Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}' 'https://api.github.com/repos/${{ github.repository }}/dependabot/alerts' | jq -r '.[]')" ]; then
+            echo "vuln=true" >> $GITHUB_OUTPUT
+          else
+            echo "vuln=false" >> $GITHUB_OUTPUT
+          fi
+
+  # CodeQL Analysis
+  codeql:
+    name: CodeQL Analysis
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: python
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:python"
+
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: codeql-report
+          path: results/

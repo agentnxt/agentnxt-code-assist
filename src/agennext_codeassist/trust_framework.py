@@ -106,7 +106,11 @@ USAGE:
 ======
 
 ```python
+<<<<<<< HEAD:src/agennext_codeassist/trust_framework.py
+from agennext_codeassist.heart_of_saying_yes import get_heart
+=======
 from agentnxt_code_assist.heart_of_saying_yes import get_heart
+>>>>>>> origin/main:src/agentnxt_code_assist/trust_framework.py
 
 # Trust-building responses
 heart = get_heart()

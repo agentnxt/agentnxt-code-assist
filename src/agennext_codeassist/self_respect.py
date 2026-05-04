@@ -68,7 +68,11 @@ USAGE:
 ======
 
 ```python
+<<<<<<< HEAD:src/agennext_codeassist/self_respect.py
+from agennext_codeassist.trust_framework import get_trust_framework
+=======
 from agentnxt_code_assist.trust_framework import get_trust_framework
+>>>>>>> origin/main:src/agentnxt_code_assist/self_respect.py
 
 # Trust & self-respect work together
 # - One builds trust with others

@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from email.message import EmailMessage
 from urllib.parse import parse_qs, unquote, urlparse
 
-from agentnxt_code_assist.schemas import AssistResult
+from agennext_codeassist.schemas import AssistResult
 
 
 @dataclass(frozen=True)

@@ -4,8 +4,8 @@ from pathlib import Path
 
 import pytest
 
-from agentnxt_code_assist.aider_runner import AiderCodeAssist
-from agentnxt_code_assist.schemas import AssistRequest
+from agennext_codeassist.aider_runner import AiderCodeAssist
+from agennext_codeassist.schemas import AssistRequest
 
 
 def test_resolve_files_keeps_relative_files_inside_repo(tmp_path: Path) -> None:

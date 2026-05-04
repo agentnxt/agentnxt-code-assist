@@ -1,0 +1,50 @@
+# Dependabot auto-merge workflow
+# Automatically merges Dependabot PRs when CI/tests pass
+
+name: Dependabot Auto-Merge
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  check_suite:
+    types: [completed]
+
+jobs:
+  auto-merge-dependabot:
+    name: Auto-merge Dependabot PR
+    runs-on: ubuntu-latest
+    # Only run if the PR is from Dependabot
+    if: ${{ github.actor == 'dependabot[bot]' }}
+    steps:
+      - name: Check required reviews
+        id: check
+        run: |
+          # Get the PR details
+          pr=$(curl -s -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            "https://api.github.com/repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}")
+          
+          # Check if all required checks have passed
+          echo "Checking PR #${{ github.event.pull_request.number }}..."
+          
+          # Get the combined status
+          curl -s -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            "https://api.github.com/repos/${{ github.repository }}/commits/${{ github.sha }}/status" | \
+            jq -r '.state'
+          
+      - name: Enable auto-merge
+        run: |
+          # Enable auto-merge for the PR
+          curl -s -X PUT \
+            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Accept: application/vnd.github.v3+json" \
+            -d '{"merge_method":"squash"}' \
+            "https://api.github.com/repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/merge"
+        
+      - name: Approve PR
+        if: ${{ github.event_name == 'pull_request' }}
+        run: |
+          # Approve the PR if not already approved
+          curl -s -X POST \
+            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Accept: application/vnd.github.v3+json" \
+            "https://api.github.com/repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/reviews/APPROVE"

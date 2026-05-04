@@ -1,6 +1,12 @@
+<<<<<<< HEAD
+# AGenNext Kernel, Runner, and CodeAssist architecture
+
+AGenNext CodeAssist is an agent. It must not be treated as the ultimate policy enforcement point.
+=======
 # AGenNext Kernel, Runner, and Code Assist architecture
 
 AGenNext Code Assist is an agent. It must not be treated as the ultimate policy enforcement point.
+>>>>>>> origin/main
 
 **AGenNext Kernel is the infrastructure abstraction layer.**
 
@@ -22,7 +28,11 @@ AGenNext Runner
   -> enforces AuthZEN decisions and runtime guardrails
   -> invokes Kernel primitives for actual infrastructure operations
 
+<<<<<<< HEAD
+AGenNext CodeAssist
+=======
 AGenNext Code Assist
+>>>>>>> origin/main
   -> agent / requester / planner
   -> proposes code changes
   -> requests capabilities from Runner
@@ -36,7 +46,11 @@ User / Operator
   -> authenticates with OIDC
   -> gives intent and explicit authorization flags
 
+<<<<<<< HEAD
+AGenNext CodeAssist Agent
+=======
 AGenNext Code Assist Agent
+>>>>>>> origin/main
   -> proposes and prepares actions
   -> requests capabilities from AGenNext Runner
   -> never self-authorizes privileged actions
@@ -71,7 +85,11 @@ GitHub API / Git CLI / Sandbox / Containers / Cloud
 
 | Component | Role |
 |---|---|
+<<<<<<< HEAD
+| CodeAssist | Agent / requester / planner |
+=======
 | Code Assist | Agent / requester / planner |
+>>>>>>> origin/main
 | AGenNext Runner | Runtime / policy enforcement point |
 | AGenNext Kernel | Infrastructure abstraction layer |
 | OIDC provider | Authentication provider |
@@ -82,7 +100,11 @@ GitHub API / Git CLI / Sandbox / Containers / Cloud
 
 ## Design rule
 
+<<<<<<< HEAD
+CodeAssist may build authorization requests and propose changes, but it must not be trusted to enforce its own permissions.
+=======
 Code Assist may build authorization requests and propose changes, but it must not be trusted to enforce its own permissions.
+>>>>>>> origin/main
 
 The enforcement boundary is **AGenNext Runner**.
 
@@ -115,9 +137,15 @@ Kernel should own abstractions for:
 ## AuthZEN and capability request flow
 
 ```text
+<<<<<<< HEAD
+1. CodeAssist receives user intent.
+2. CodeAssist identifies desired action: run, write, commit, push, open_pr, notify, etc.
+3. CodeAssist requests a scoped capability from AGenNext Runner.
+=======
 1. Code Assist receives user intent.
 2. Code Assist identifies desired action: run, write, commit, push, open_pr, notify, etc.
 3. Code Assist requests a scoped capability from AGenNext Runner.
+>>>>>>> origin/main
 4. AGenNext Runner builds/sends subject/action/resource/context to an AuthZEN-compatible service.
 5. AuthZEN-compatible service returns allow/deny and reason.
 6. AGenNext Runner enforces the decision.
@@ -128,7 +156,11 @@ Kernel should own abstractions for:
 
 ## Capability request shape
 
+<<<<<<< HEAD
+CodeAssist should ask Runner for capabilities, not directly execute privileged operations.
+=======
 Code Assist should ask Runner for capabilities, not directly execute privileged operations.
+>>>>>>> origin/main
 
 Example:
 
@@ -174,16 +206,26 @@ Agent required but Agent ID unavailable = Runner denies
 Audit trace unavailable = Runner denies
 Security gate unavailable = Runner denies when required
 Unknown update path = Runner denies
+<<<<<<< HEAD
+CodeAssist self-approval = Runner denies
+=======
 Code Assist self-approval = Runner denies
+>>>>>>> origin/main
 Expired capability = Runner denies
 Capability constraint mismatch = Runner denies
 Unauthorized Kernel primitive = Runner denies
 Kernel backend unavailable for required operation = Runner denies or fails closed
 ```
 
+<<<<<<< HEAD
+## What CodeAssist can do
+
+CodeAssist can:
+=======
 ## What Code Assist can do
 
 Code Assist can:
+>>>>>>> origin/main
 
 - describe the requested action
 - build an AuthZEN-compatible access evaluation request shape for Runner
@@ -194,9 +236,15 @@ Code Assist can:
 - report policy decision results to the user
 - include sanitized policy context in change logs
 
+<<<<<<< HEAD
+## What CodeAssist must not do
+
+CodeAssist must not:
+=======
 ## What Code Assist must not do
 
 Code Assist must not:
+>>>>>>> origin/main
 
 - self-authorize privileged actions
 - bypass AGenNext Runner
@@ -213,7 +261,11 @@ Use these terms in code and docs:
 ```text
 AGenNext Kernel / infra abstraction layer
 AGenNext Runner / runtime enforcement point
+<<<<<<< HEAD
+CodeAssist Agent / requester
+=======
 Code Assist Agent / requester
+>>>>>>> origin/main
 AuthZEN Decision Point
 Audit Trace Service
 Repository Operation Backend
@@ -221,7 +273,11 @@ Scoped Capability
 Kernel Primitive
 ```
 
+<<<<<<< HEAD
+Avoid describing CodeAssist itself as the final enforcer. Local development code may have lightweight guardrail checks, but production enforcement belongs to AGenNext Runner, and concrete infrastructure execution belongs behind AGenNext Kernel.
+=======
 Avoid describing Code Assist itself as the final enforcer. Local development code may have lightweight guardrail checks, but production enforcement belongs to AGenNext Runner, and concrete infrastructure execution belongs behind AGenNext Kernel.
+>>>>>>> origin/main
 
 ## Practical deployment
 
@@ -230,7 +286,11 @@ Recommended production deployment:
 ```text
 Browser / CLI
   -> AGenNext Runner
+<<<<<<< HEAD
+  -> AGenNext CodeAssist Agent
+=======
   -> AGenNext Code Assist Agent
+>>>>>>> origin/main
   -> Agent ID registry
   -> AuthZEN-compatible authorization service
   -> Audit Trace Service
@@ -238,4 +298,8 @@ Browser / CLI
   -> GitHub API / Git CLI / Sandbox / Container / Cloud / Kubernetes backend
 ```
 
+<<<<<<< HEAD
+AGenNext Runner owns capabilities and enforcement. AGenNext Kernel owns infrastructure abstraction. CodeAssist only receives the capabilities Runner grants for that run.
+=======
 AGenNext Runner owns capabilities and enforcement. AGenNext Kernel owns infrastructure abstraction. Code Assist only receives the capabilities Runner grants for that run.
+>>>>>>> origin/main

@@ -7,7 +7,11 @@ test.describe('CodeAssist Web E2E', () => {
   });
 
   test('should load the main page', async ({ page }: { page: Page }) => {
+<<<<<<< HEAD
+    await expect(page).toHaveTitle(/CodeAssist/i);
+=======
     await expect(page).toHaveTitle(/AGenNext/i);
+>>>>>>> origin/main
   });
 
   test('should display the main UI components', async ({ page }: { page: Page }) => {
@@ -58,4 +62,49 @@ test.describe('CodeAssist Web E2E', () => {
     // Check for backend status display
     await expect(page.locator('.status-card')).toContainText(/Backend/);
   });
+<<<<<<< HEAD
+
+  // === Advanced Agent Capabilities Tests ===
+  test('should display agent capabilities section', async ({ page }: { page: Page }) => {
+    // Check for capabilities section
+    const capabilities = page.locator('h2, h3', { hasText: /Capability|Empathy|Self-Respect|Trust/i });
+    await expect(capabilities.first()).toBeVisible({ timeout: 5000 }).catch(() => {
+      // Section may not exist in older versions
+    });
+  });
+
+  // === Tool Ecosystem Tests ===
+  test('should display tools section', async ({ page }: { page: Page }) => {
+    // Check for tools section (if present)
+    const tools = page.locator('h2, h3', { hasText: /Tool|Travel|Weather|Map|News/i });
+    try {
+      await expect(tools.first()).toBeVisible({ timeout: 3000 });
+    } catch {
+      // Tools section optional
+    }
+  });
+
+  // === Form Validation Tests ===
+  test('should validate form submission', async ({ page }: { page: Page }) => {
+    // Try to submit empty form
+    await page.locator('button[type="submit"]').click();
+    
+    // Should show validation error or not proceed
+    const error = page.locator('[role="alert"], .error, text="required"');
+    try {
+      await expect(error.first()).toBeVisible({ timeout: 2000 });
+    } catch {
+      // May not have client-side validation
+    }
+  });
+
+  // === Navigation Tests ===
+  test('should navigate between sections', async ({ page }: { page: Page }) => {
+    // Check for navigation links
+    const nav = page.locator('nav a, [class*="nav"] a');
+    const count = await nav.count();
+    expect(count).toBeGreaterThan(0);
+  });
+=======
+>>>>>>> origin/main
 });

@@ -1,13 +1,21 @@
 # Generic AuthZEN support
 
+<<<<<<< HEAD
+AGenNext CodeAssist supports a provider-neutral AuthZEN authorization adapter.
+=======
 AGenNext Code Assist supports a provider-neutral AuthZEN authorization adapter.
+>>>>>>> origin/main
 
 AuthZEN is used for externalized authorization decisions. It is separate from authentication.
 
 ```text
 OIDC or another auth provider -> authenticates the user/operator
 AuthZEN-compatible service    -> evaluates access decisions
+<<<<<<< HEAD
+CodeAssist                   -> enforces allow/deny before protected actions
+=======
 Code Assist                   -> enforces allow/deny before protected actions
+>>>>>>> origin/main
 ```
 
 ## Environment variables
@@ -83,12 +91,20 @@ The adapter also accepts `allowed`, `allow`, or `decision` fields with boolean o
 AUTHZ_REQUIRED=true + AuthZEN unavailable = deny
 AUTHZEN_FAIL_CLOSED=true + invalid response = deny
 AuthZEN deny = deny
+<<<<<<< HEAD
+AuthZEN allow = CodeAssist may continue to local guardrails/checks
+=======
 AuthZEN allow = Code Assist may continue to local guardrails/checks
+>>>>>>> origin/main
 ```
 
 ## Example actions
 
+<<<<<<< HEAD
+Recommended CodeAssist action names:
+=======
 Recommended Code Assist action names:
+>>>>>>> origin/main
 
 ```text
 view
@@ -107,4 +123,8 @@ admin_gate
 
 ## Design note
 
+<<<<<<< HEAD
+CodeAssist should stay generic. CaaS, OpenFGA, OPA, SpiceDB, or any other authorization platform can implement the AuthZEN-compatible evaluation endpoint outside this repo.
+=======
 Code Assist should stay generic. CaaS, OpenFGA, OPA, SpiceDB, or any other authorization platform can implement the AuthZEN-compatible evaluation endpoint outside this repo.
+>>>>>>> origin/main

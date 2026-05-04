@@ -25,15 +25,13 @@ ui = [
 ]
 
 [project.scripts]
-agennext-code-assist = "agentnxt_code_assist.cli:main"
-# Backward-compatible alias. Prefer `agennext-code-assist` for new usage.
-agentnxt-code-assist = "agentnxt_code_assist.cli:main"
+agennext-code-assist = "agennext_codeassist.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
 
 [tool.setuptools.package-data]
-agentnxt_code_assist = ["static/*"]
+agennext_codeassist = ["static/*"]
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]

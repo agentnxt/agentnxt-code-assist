@@ -1,8 +1,16 @@
+<<<<<<< HEAD
+from agennext_codeassist.authzen import normalize_authzen_decision
+from agennext_codeassist.agent_id_protocol import parse_agent_id_record
+from agennext_codeassist.protocols import ProtocolConfig, build_interop_metadata, build_openfga_metadata, build_opa_metadata
+from agennext_codeassist.runner_client import normalize_runner_decision
+from agennext_codeassist.schemas import AssistRequest
+=======
 from agentnxt_code_assist.authzen import normalize_authzen_decision
 from agentnxt_code_assist.agent_id_protocol import parse_agent_id_record
 from agentnxt_code_assist.protocols import ProtocolConfig, build_interop_metadata, build_openfga_metadata, build_opa_metadata
 from agentnxt_code_assist.runner_client import normalize_runner_decision
 from agentnxt_code_assist.schemas import AssistRequest
+>>>>>>> origin/main
 
 
 def test_authzen_normalization():

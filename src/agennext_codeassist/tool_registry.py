@@ -311,7 +311,11 @@ class ToolsRegistry:
         
         # Filter by constraints if context provided
         if context:
+<<<<<<< HEAD:src/agennext_codeassist/tool_registry.py
+            from agennext_codeassist.context_aware import check_constraints
+=======
             from agentnxt_code_assist.context_aware import check_constraints
+>>>>>>> origin/main:src/agentnxt_code_assist/tool_registry.py
             valid_tools = []
             for tool in tools:
                 # Check if tool's estimated time fits budget
@@ -514,7 +518,11 @@ def get_web_search_context(task: str) -> str:
         return ""
     
     # Use web search
+<<<<<<< HEAD:src/agennext_codeassist/tool_registry.py
+    from agennext_codeassist import tavily_tavily_search
+=======
     from agentnxt_code_assist import tavily_tavily_search
+>>>>>>> origin/main:src/agentnxt_code_assist/tool_registry.py
     try:
         results = tavily_tavily_search(
             query=fallback,

@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from pathlib import Path
 
-from agentnxt_code_assist.schemas import CheckResult, RepoAnomalyResult
+from agennext_codeassist.schemas import CheckResult, RepoAnomalyResult
 
 
 def build_change_log(
