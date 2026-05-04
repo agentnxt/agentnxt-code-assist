@@ -165,3 +165,23 @@ pip install pip-audit && pip-audit
 | Situation Awareness | Context monitoring |
 | Self-Improvement | Continuous learning |
 | Decision Logging | Execution reasoning |
+
+## Continuous Improvement
+
+Every bug is logged with:
+
+1. **Root Cause Analysis** - Why it happened (exception type, context)
+2. **Prevention** - How to avoid in future
+3. **Recommendations** - Skill/tool enhancements if needed
+
+### API Endpoints
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /improvements/bugs` | List bug records |
+| `GET /improvements/unfixed` | Get unfixed bugs |
+| `GET /improvements/recommendations` | Pending improvements |
+| `GET /improvements/report` | Summary report |
+| `POST /improvements/bugs` | Log a new bug |
+| `POST /improvements/bugs/{id}/fix` | Mark bug fixed |
+| `POST /improvements/recommendations/{id}/implement` | Implement recommendation |

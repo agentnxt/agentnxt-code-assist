@@ -431,3 +431,99 @@ async def openapi():
         routes=app.routes,
     )
     return schema
+
+
+# === Continuous Improvement API ===
+
+from agentnxt_code_assist.continuous_improvement import (
+    BugCategory,
+    BugSeverity,
+    get_improver,
+)
+
+
+@app.get("/improvements/bugs")
+def list_bugs(limit: int = 50) -> dict[str, list]:
+    """Get recent bug records."""
+    return {"bugs": get_improver().get_bugs(limit)}
+
+
+@app.get("/improvements/unfixed")
+def list_unfixed_bugs() -> dict[str, list]:
+    """Get unfixed bugs."""
+    return {"bugs": get_improver().get_unfixed_bugs()}
+
+
+@app.get("/improvements/recommendations")
+def list_recommendations() -> dict[str, list]:
+    """Get pending recommendations."""
+    return {"recommendations": get_improver().get_recommendations()}
+
+
+@app.get("/improvements/report")
+def improvement_report() -> str:
+    """Get improvement report."""
+    return get_improver().generate_report()
+
+
+from pydantic import BaseModel
+
+
+class BugInput(BaseModel):
+    description: str
+    severity: str = "medium"
+    category: str = "unknown"
+    exception_type: str | None = None
+    exception_message: str | None = None
+    file_path: str | None = None
+    line_number: int | None = None
+
+
+@app.post("/improvements/bugs")
+def log_bug(input: BugInput) -> dict[str, str]:
+    """Log a new bug."""
+    try:
+        severity_enum = BugSeverity(input.severity)
+    except ValueError:
+        severity_enum = BugSeverity.MEDIUM
+    
+    try:
+        category_enum = BugCategory(input.category)
+    except ValueError:
+        category_enum = BugCategory.UNKNOWN
+    
+    bug_id = get_improver().log_bug(
+        description=input.description,
+        severity=severity_enum,
+        category=category_enum,
+        context={"exception_type": input.exception_type, "exception_message": input.exception_message},
+        file_path=input.file_path,
+        line_number=input.line_number,
+    )
+    
+    return {"bug_id": bug_id, "status": "logged"}
+
+
+class FixInput(BaseModel):
+    fix_description: str
+    skills_enhanced: list[str] = []
+    tools_enhanced: list[str] = []
+
+
+@app.post("/improvements/bugs/{bug_id}/fix")
+def apply_fix(bug_id: str, input: FixInput) -> dict[str, bool]:
+    """Mark a bug as fixed."""
+    success = get_improver().apply_fix(
+        bug_id,
+        input.fix_description,
+        input.skills_enhanced,
+        input.tools_enhanced,
+    )
+    return {"success": success}
+
+
+@app.post("/improvements/recommendations/{recommendation_id}/implement")
+def implement_recommendation(recommendation_id: str, notes: str | None = None) -> dict[str, bool]:
+    """Mark recommendation as implemented."""
+    success = get_improver().implement_recommendation(recommendation_id, notes)
+    return {"success": success}
