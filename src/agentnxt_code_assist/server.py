@@ -827,3 +827,219 @@ def get_blocked_tasks(project_id: str, task_id: str) -> dict[str, list]:
 def project_report() -> str:
     """Get project management report."""
     return get_manager().generate_report()
+
+
+# === Daily Status API ===
+
+from agentnxt_code_assist.daily_status import (
+    DailyStatusReporter,
+    get_reporter,
+)
+
+
+@app.get("/daily/summary")
+def daily_summary() -> dict:
+    """Get today's summary."""
+    return asdict(get_reporter().generate_summary())
+
+
+@app.get("/daily/report/email")
+def email_report() -> dict[str, str]:
+    """Generate email report."""
+    subject, body = get_reporter().generate_email_report()
+    return {"subject": subject, "body": body}
+
+
+@app.get("/daily/report/slack")
+def slack_report() -> dict:
+    """Generate Slack report."""
+    return get_reporter().generate_slack_report()
+
+
+@app.post("/daily/send")
+def send_daily_report() -> dict:
+    """Send daily report via all configured channels."""
+    return get_reporter().send_all()
+
+
+class CompletedTaskInput(BaseModel):
+    task_name: str
+    description: str = ""
+
+
+@app.post("/daily/completed")
+def log_completed_task(input: CompletedTaskInput) -> dict[str, str]:
+    """Log a completed task."""
+    task_id = get_reporter().add_completed_task(input.task_name, input.description)
+    return {"task_id": task_id, "status": "logged"}
+
+
+class PlanInput(BaseModel):
+    task_name: str
+    priority: str = "medium"
+
+
+@app.post("/daily/plan")
+def add_daily_plan(input: PlanInput) -> dict[str, str]:
+    """Add plan for next day."""
+    plan_id = get_reporter().add_plan(input.task_name, input.priority)
+    return {"plan_id": plan_id, "status": "logged"}
+
+
+class BlockerInput(BaseModel):
+    description: str
+    severity: str = "medium"
+
+
+@app.post("/daily/blockers")
+def add_blocker(input: BlockerInput) -> dict[str, str]:
+    """Add a blocker."""
+    blocker_id = get_reporter().add_blocker(input.description, input.severity)
+    return {"blocker_id": blocker_id, "status": "logged"}
+
+
+@app.post("/daily/blockers/{blocker_id}/resolve")
+def resolve_blocker(blocker_id: str) -> dict[str, bool]:
+    """Resolve a blocker."""
+    success = get_reporter().resolve_blocker(blocker_id)
+    return {"success": success}
+
+
+# === Jira Integration API ===
+
+from agentnxt_code_assist.jira_integration import (
+    JiraIntegration,
+    get_jira,
+    JiraIssueType,
+    JiraPriority,
+    JiraStatus,
+)
+
+
+@app.get("/jira/config")
+def jira_config() -> dict:
+    """Get Jira configuration status."""
+    return {
+        "configured": get_jira().config.is_configured,
+        "url": get_jira().config.url,
+        "project_key": get_jira().config.project_key,
+    }
+
+
+@app.get("/jira/issues")
+def list_jira_issues(jql: str = "") -> dict[str, list]:
+    """Search Jira issues."""
+    return {"issues": get_jira().search_issues(jql)}
+
+
+@app.get("/jira/issues/{jira_key}")
+def get_jira_issue(jira_key: str) -> dict:
+    """Get Jira issue details."""
+    issue = get_jira().get_issue(jira_key)
+    if not issue:
+        raise HTTPException(status_code=404, detail="Issue not found")
+    return issue
+
+
+class JiraIssueInput(BaseModel):
+    summary: str
+    description: str = ""
+    issue_type: str = "Task"
+    priority: str = "Medium"
+    parent_key: str | None = None
+
+
+@app.post("/jira/issues")
+def create_jira_issue(input: JiraIssueInput) -> dict:
+    """Create a Jira issue."""
+    try:
+        issue_type = JiraIssueType(input.issue_type)
+    except ValueError:
+        issue_type = JiraIssueType.TASK
+    
+    try:
+        priority = JiraPriority(input.priority)
+    except ValueError:
+        priority = JiraPriority.MEDIUM
+    
+    return get_jira().create_issue(
+        input.summary,
+        input.description,
+        issue_type,
+        priority,
+        input.parent_key,
+    )
+
+
+class JiraUpdateInput(BaseModel):
+    summary: str | None = None
+    description: str | None = None
+    status: str | None = None
+    priority: str | None = None
+
+
+@app.put("/jira/issues/{jira_key}")
+def update_jira_issue(jira_key: str, input: JiraUpdateInput) -> dict:
+    """Update a Jira issue."""
+    status = None
+    if input.status:
+        try:
+            status = JiraStatus(input.status)
+        except ValueError:
+            pass
+    
+    priority = None
+    if input.priority:
+        try:
+            priority = JiraPriority(input.priority)
+        except ValueError:
+            pass
+    
+    return get_jira().update_issue(
+        jira_key,
+        input.summary,
+        input.description,
+        status,
+        priority,
+    )
+
+
+@app.post("/jira/issues/{jira_key}/transition")
+def transition_jira_issue(jira_key: str, status: str) -> dict:
+    """Transition Jira issue."""
+    try:
+        status_enum = JiraStatus(status)
+    except ValueError:
+        return {"error": "Invalid status"}
+    
+    return get_jira().transition_issue(jira_key, status_enum)
+
+
+class JiraLinkInput(BaseModel):
+    from_key: str
+    to_key: str
+    link_type: str = "Blocks"
+
+
+@app.post("/jira/links")
+def link_jira_issues(input: JiraLinkInput) -> dict:
+    """Link two Jira issues."""
+    return get_jira().link_issue(input.from_key, input.to_key, input.link_type)
+
+
+@app.post("/jira/sync/{project_id}/from")
+def sync_from_jira(project_id: str) -> dict:
+    """Sync tasks from Jira to local project."""
+    return get_jira().sync_from_jira(project_id)
+
+
+@app.post("/jira/sync/{project_id}/to")
+def sync_to_jira(project_id: str) -> dict:
+    """Sync local tasks to Jira."""
+    return get_jira().sync_to_jira(project_id)
+
+
+@app.get("/jira/mappings")
+def list_jira_mappings() -> dict[str, list]:
+    """Get Jira-local mappings."""
+    return {"mappings": get_jira().get_mappings()}
