@@ -601,7 +601,7 @@ Legacy `AGENTNXT_CODE_ASSIST_*` variables are still accepted as compatibility fa
 ## Python usage
 
 ```python
-from agentnxt_code_assist import AiderCodeAssist, AssistRequest
+from agennext_codeassist import AiderCodeAssist, AssistRequest
 
 assistant = AiderCodeAssist()
 result = assistant.run(
